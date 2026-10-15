@@ -1,0 +1,33 @@
+name: Pullwatch
+options:
+  bundleIdPrefix: nl.torrisi
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  PullwatchCore:
+    path: .
+targets:
+  Pullwatch:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    dependencies:
+      - package: PullwatchCore
+    info:
+      path: App/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleDisplayName: Pullwatch
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.torrisi.pullwatch
+        PRODUCT_NAME: Pullwatch
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: NO
+        GENERATE_INFOPLIST_FILE: NO
+    scheme: {}
