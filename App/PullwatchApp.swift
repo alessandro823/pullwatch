@@ -27,5 +27,10 @@ struct PullwatchApp: App {
             }
         }
         .menuBarExtraStyle(.window)
+
+        Window("Pullwatch instellingen", id: "settings") {
+            SettingsView(model: model)
+        }
+        .windowResizability(.contentMinSize)
     }
 }

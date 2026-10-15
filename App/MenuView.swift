@@ -57,9 +57,15 @@ struct MenuView: View {
     }
 }
 
-/// In Task 12 nog leeg; Task 13 vult deze met het openen van het settings-venster.
 struct SettingsButton: View {
-    var body: some View { EmptyView() }
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Instellingen…") {
+            openWindow(id: "settings")
+            NSApp.activate()
+        }
+    }
 }
 
 private struct RecentRow: View {
