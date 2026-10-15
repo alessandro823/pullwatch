@@ -1,0 +1,205 @@
+import Foundation
+import os
+
+private let logger = Logger(subsystem: "nl.torrisi.pullwatch", category: "engine")
+
+public enum AccountState: Equatable, Sendable {
+    case idle
+    case ok(lastPoll: Date)
+    case failed(ProviderError, since: Date)
+}
+
+public struct PollResult: Equatable, Sendable {
+    public var newPullRequests: [PullRequest] = []
+    public var statuses: [UUID: AccountState] = [:]
+    /// Accounts die in deze cyclus net naar `.unauthorized` gingen (één melding per overgang).
+    public var authFailures: [UUID] = []
+}
+
+public actor PollEngine {
+    public typealias ProviderFactory = @Sendable (Account) -> any PRProvider
+
+    private struct Schedule {
+        var nextDue: Date = .distantPast
+        var failures = 0
+        var rateLimitedUntil: Date?
+    }
+
+    private struct Fetched {
+        let userId: String
+        let pullRequests: [PullRequest]
+    }
+
+    private let makeProvider: ProviderFactory
+    private let store: JSONFileStore<SeenState>?
+    private let now: @Sendable () -> Date
+    private var state: SeenState
+    private var providers: [UUID: (account: Account, provider: any PRProvider)] = [:]
+    private var userIds: [UUID: String] = [:]
+    private var schedules: [UUID: Schedule] = [:]
+    private var statuses: [UUID: AccountState] = [:]
+
+    public init(
+        makeProvider: @escaping ProviderFactory,
+        store: JSONFileStore<SeenState>?,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.makeProvider = makeProvider
+        self.store = store
+        self.now = now
+        do {
+            self.state = try store?.load() ?? SeenState()
+        } catch {
+            logger.error("seen-state onleesbaar, start leeg: \(error.localizedDescription)")
+            self.state = SeenState()
+        }
+    }
+
+    public func forceRefresh() {
+        let t = now()
+        for (id, var schedule) in schedules {
+            if let until = schedule.rateLimitedUntil, until > t { continue }
+            schedule.nextDue = t
+            schedules[id] = schedule
+        }
+    }
+
+    public func poll(accounts: [Account], interval: TimeInterval) async -> PollResult {
+        let t = now()
+        forget(except: Set(accounts.map(\.id)))
+
+        let jobs = accounts
+            .filter { (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
+            .map { (account: $0, provider: provider(for: $0), userId: userIds[$0.id]) }
+
+        let outcomes = await withTaskGroup(of: (UUID, Result<Fetched, ProviderError>).self) { group in
+            for job in jobs {
+                group.addTask {
+                    (job.account.id, await Self.fetch(job.provider, knownUserId: job.userId))
+                }
+            }
+            var collected: [UUID: Result<Fetched, ProviderError>] = [:]
+            for await (id, outcome) in group {
+                collected[id] = outcome
+            }
+            return collected
+        }
+
+        var result = PollResult()
+        for job in jobs {
+            guard let outcome = outcomes[job.account.id] else { continue }
+            switch outcome {
+            case .success(let fetched):
+                result.newPullRequests += handleSuccess(job.account, fetched, at: t, interval: interval)
+            case .failure(let error):
+                if await handleFailure(job.account, job.provider, error, at: t, interval: interval) {
+                    result.authFailures.append(job.account.id)
+                }
+            }
+        }
+
+        state.prune(now: t)
+        do {
+            try store?.save(state)
+        } catch {
+            logger.error("seen-state opslaan mislukt: \(error.localizedDescription)")
+        }
+
+        result.newPullRequests.sort { $0.createdAt < $1.createdAt }
+        result.statuses = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, statuses[$0.id] ?? .idle) })
+        return result
+    }
+
+    private static func fetch(_ provider: any PRProvider, knownUserId: String?) async -> Result<Fetched, ProviderError> {
+        do {
+            let userId: String
+            if let knownUserId {
+                userId = knownUserId
+            } else {
+                userId = try await provider.currentUserId()
+            }
+            let pullRequests = try await provider.openPullRequests()
+            return .success(Fetched(userId: userId, pullRequests: pullRequests))
+        } catch let error as ProviderError {
+            return .failure(error)
+        } catch {
+            return .failure(.network(error.localizedDescription))
+        }
+    }
+
+    private func provider(for account: Account) -> any PRProvider {
+        if let cached = providers[account.id], cached.account == account {
+            return cached.provider
+        }
+        let provider = makeProvider(account)
+        providers[account.id] = (account, provider)
+        userIds[account.id] = nil
+        return provider
+    }
+
+    private func forget(except ids: Set<UUID>) {
+        providers = providers.filter { ids.contains($0.key) }
+        userIds = userIds.filter { ids.contains($0.key) }
+        schedules = schedules.filter { ids.contains($0.key) }
+        statuses = statuses.filter { ids.contains($0.key) }
+        let keys = Set(ids.map(\.uuidString))
+        state.lastSettings = state.lastSettings.filter { keys.contains($0.key) }
+    }
+
+    private func handleSuccess(_ account: Account, _ fetched: Fetched, at t: Date, interval: TimeInterval) -> [PullRequest] {
+        let settings = account.filterSettings
+        let key = account.id.uuidString
+        let previous = state.lastSettings[key].flatMap { $0.sameSource(as: settings) ? $0 : nil }
+
+        var fresh: [PullRequest] = []
+        for pr in fetched.pullRequests where PRFilter.passes(pr, settings: settings, currentUserId: fetched.userId) {
+            // Alleen melden als de PR onder de vorige settings ook zichtbaar was; anders is hij
+            // pas zichtbaar door een instellingswijziging of eerste poll → stil seeden.
+            if !state.contains(pr.dedupKey), let previous,
+               PRFilter.passes(pr, settings: previous, currentUserId: fetched.userId) {
+                fresh.append(pr)
+            }
+            state.mark(pr.dedupKey, at: t)
+        }
+
+        state.lastSettings[key] = settings
+        userIds[account.id] = fetched.userId
+        schedules[account.id] = Schedule(nextDue: t + interval)
+        statuses[account.id] = .ok(lastPoll: t)
+        return fresh
+    }
+
+    /// Geeft `true` als het account net naar `.unauthorized` is overgegaan.
+    private func handleFailure(
+        _ account: Account,
+        _ provider: any PRProvider,
+        _ error: ProviderError,
+        at t: Date,
+        interval: TimeInterval
+    ) async -> Bool {
+        var schedule = schedules[account.id] ?? Schedule()
+        schedule.failures += 1
+        if case .rateLimited(let until) = error {
+            schedule.rateLimitedUntil = until
+            schedule.nextDue = until
+        } else {
+            schedule.rateLimitedUntil = nil
+            schedule.nextDue = t + Backoff.delay(baseInterval: interval, consecutiveFailures: schedule.failures)
+        }
+        schedules[account.id] = schedule
+
+        var wasUnauthorized = false
+        if case .failed(let previous, let since) = statuses[account.id], previous == error {
+            wasUnauthorized = previous == .unauthorized
+            statuses[account.id] = .failed(error, since: since)
+        } else {
+            statuses[account.id] = .failed(error, since: t)
+        }
+        logger.warning("poll mislukt voor \(account.displayName, privacy: .public): \(error.userMessage, privacy: .public)")
+
+        guard error == .unauthorized else { return false }
+        userIds[account.id] = nil
+        await provider.invalidateCredentials()
+        return !wasUnauthorized
+    }
+}
