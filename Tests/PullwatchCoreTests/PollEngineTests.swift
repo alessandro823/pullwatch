@@ -219,4 +219,52 @@ private struct Harness {
         #expect(result.statuses.count == 2)
         #expect(result.statuses[other.id] == .ok(lastPoll: h.clock.now))
     }
+
+    @Test func prunedSeenOfLongFailingAccountDoesNotReNotifyAfterRecovery() async {
+        let account = Account.fixture()
+        let h = Harness(accounts: [account])
+        let a = PullRequest.fixture(accountId: account.id, number: 1)
+        await h.provider(account).set(pullRequests: [a])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        await h.provider(account).set(error: .unauthorized)
+        h.clock.advance(31 * day)
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        await h.provider(account).set(error: nil)
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newPullRequests.isEmpty)
+    }
+
+    @Test func overlappingPollDoesNotRefetchInFlightAccount() async {
+        let account = Account.fixture()
+        let gated = GatedProvider()
+        let clock = TestClock()
+        let engine = PollEngine(makeProvider: { _ in gated }, store: nil, now: { clock.now })
+
+        let first = Task { await engine.poll(accounts: [account], interval: 120) }
+        for await _ in gated.started { break }
+
+        let second = await engine.poll(accounts: [account], interval: 120)
+        #expect(second.newPullRequests.isEmpty)
+        #expect(second.statuses[account.id] == .idle)
+        #expect(await gated.fetchCount == 1)
+
+        await gated.release()
+        let firstResult = await first.value
+        #expect(firstResult.statuses[account.id] == .ok(lastPoll: clock.now))
+        #expect(await gated.fetchCount == 1)
+    }
+
+    @Test func rateLimitUntilIsClampedToOneHour() async {
+        let account = Account.fixture()
+        let h = Harness(accounts: [account])
+        await h.provider(account).set(error: .rateLimited(until: h.clock.now + 30 * day))
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        await h.provider(account).set(error: nil)
+        h.clock.advance(3601)
+        _ = await h.engine.poll(accounts: [account], interval: 120) // currentUserId faalt eerst: fetchCount blijft 0
+        #expect(await h.provider(account).fetchCount == 1)
+    }
 }

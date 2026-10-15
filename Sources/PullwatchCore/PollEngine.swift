@@ -30,6 +30,8 @@ public actor PollEngine {
         let pullRequests: [PullRequest]
     }
 
+    private static let maxRateLimitWait: TimeInterval = 3600
+
     private let makeProvider: ProviderFactory
     private let store: JSONFileStore<SeenState>?
     private let now: @Sendable () -> Date
@@ -38,6 +40,7 @@ public actor PollEngine {
     private var userIds: [UUID: String] = [:]
     private var schedules: [UUID: Schedule] = [:]
     private var statuses: [UUID: AccountState] = [:]
+    private var inFlight: Set<UUID> = []
 
     public init(
         makeProvider: @escaping ProviderFactory,
@@ -69,36 +72,38 @@ public actor PollEngine {
         forget(except: Set(accounts.map(\.id)))
 
         let jobs = accounts
-            .filter { (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
+            .filter { !inFlight.contains($0.id) && (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
             .map { (account: $0, provider: provider(for: $0), userId: userIds[$0.id]) }
+        // Markeer vóór de eerste suspensie, zodat overlappende poll()-aanroepen deze accounts overslaan.
+        for job in jobs { inFlight.insert(job.account.id) }
+        let jobsById = Dictionary(uniqueKeysWithValues: jobs.map { ($0.account.id, $0) })
 
-        let outcomes = await withTaskGroup(of: (UUID, Result<Fetched, ProviderError>).self) { group in
+        var result = PollResult()
+        var succeeded: [UUID] = []
+        await withTaskGroup(of: (UUID, Result<Fetched, ProviderError>).self) { group in
             for job in jobs {
                 group.addTask {
                     (job.account.id, await Self.fetch(job.provider, knownUserId: job.userId))
                 }
             }
-            var collected: [UUID: Result<Fetched, ProviderError>] = [:]
+            // Pas elk resultaat direct toe zodra het binnenkomt (actor-geïsoleerd).
             for await (id, outcome) in group {
-                collected[id] = outcome
-            }
-            return collected
-        }
-
-        var result = PollResult()
-        for job in jobs {
-            guard let outcome = outcomes[job.account.id] else { continue }
-            switch outcome {
-            case .success(let fetched):
-                result.newPullRequests += handleSuccess(job.account, fetched, at: t, interval: interval)
-            case .failure(let error):
-                if await handleFailure(job.account, job.provider, error, at: t, interval: interval) {
-                    result.authFailures.append(job.account.id)
+                guard let job = jobsById[id] else { continue }
+                switch outcome {
+                case .success(let fetched):
+                    result.newPullRequests += handleSuccess(job.account, fetched, at: t, interval: interval)
+                    succeeded.append(id)
+                case .failure(let error):
+                    if await handleFailure(job.account, job.provider, error, at: t, interval: interval) {
+                        result.authFailures.append(id)
+                    }
                 }
+                inFlight.remove(id)
             }
         }
 
-        state.prune(now: t)
+        // Alleen accounts die nu slaagden prunen: een langdurig falend account mag zijn seen niet kwijtraken.
+        state.prune(now: t, onlyKeyPrefixes: succeeded.map { "\($0.uuidString):" })
         do {
             try store?.save(state)
         } catch {
@@ -144,6 +149,7 @@ public actor PollEngine {
         statuses = statuses.filter { ids.contains($0.key) }
         let keys = Set(ids.map(\.uuidString))
         state.lastSettings = state.lastSettings.filter { keys.contains($0.key) }
+        state.retain(onlyKeyPrefixes: keys.map { "\($0):" })
     }
 
     private func handleSuccess(_ account: Account, _ fetched: Fetched, at t: Date, interval: TimeInterval) -> [PullRequest] {
@@ -180,8 +186,9 @@ public actor PollEngine {
         var schedule = schedules[account.id] ?? Schedule()
         schedule.failures += 1
         if case .rateLimited(let until) = error {
-            schedule.rateLimitedUntil = until
-            schedule.nextDue = until
+            let clamped = min(until, t + Self.maxRateLimitWait)
+            schedule.rateLimitedUntil = clamped
+            schedule.nextDue = clamped
         } else {
             schedule.rateLimitedUntil = nil
             schedule.nextDue = t + Backoff.delay(baseInterval: interval, consecutiveFailures: schedule.failures)

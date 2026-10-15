@@ -42,4 +42,15 @@ import Testing
 
         #expect(try store.load() == state)
     }
+
+    @Test func prefixScopedPruneAndRetain() {
+        var state = SeenState()
+        state.mark("a:x", at: t0)
+        state.mark("b:x", at: t0)
+        state.prune(now: t0 + 31 * 24 * 3600, onlyKeyPrefixes: ["a:"])
+        #expect(!state.contains("a:x"))
+        #expect(state.contains("b:x"))
+        state.retain(onlyKeyPrefixes: ["a:"])
+        #expect(state.seen.isEmpty)
+    }
 }
