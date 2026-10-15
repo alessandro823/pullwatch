@@ -58,10 +58,20 @@ import Testing
         #expect(try await makeProvider(http).openPullRequests().first?.isDraft == false)
     }
 
-    @Test func displayNameIsLogin() async throws {
+    @Test func testConnectionReturnsLoginAfterResolvingOwner() async throws {
         let http = MockHTTPClient()
+        http.on("users/acme", body: #"{"type":"Organization"}"#)
         http.on("github.com/user", body: #"{"login":"alessandro"}"#)
-        #expect(try await makeProvider(http).currentUserDisplayName() == "alessandro")
+        #expect(try await makeProvider(http).testConnection() == "alessandro")
+        #expect(http.requests.contains { $0.url!.absoluteString.hasSuffix("users/acme") })
+    }
+
+    @Test func testConnectionReportsNoAccessForUnknownOwner() async {
+        let http = MockHTTPClient()
+        http.on("users/acme", status: 404, body: #"{"message":"Not Found"}"#)
+        http.on("github.com/user", body: #"{"login":"alessandro"}"#)
+        let provider = makeProvider(http)
+        await #expect(throws: ProviderError.noAccess("acme")) { try await provider.testConnection() }
     }
 
     @Test func sendsBearerAndGitHubHeaders() async throws {

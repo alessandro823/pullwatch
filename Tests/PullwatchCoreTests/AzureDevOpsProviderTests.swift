@@ -73,11 +73,31 @@ import Testing
         #expect(http.requests.first?.value(forHTTPHeaderField: "Authorization") == "Bearer jwt")
     }
 
-    @Test func displayNameComesFromProviderDisplayName() async throws {
+    @Test func testConnectionReturnsDisplayNameAfterCheckingOrganizationAccess() async throws {
         let http = MockHTTPClient()
         http.on("connectionData", body: #"{"authenticatedUser":{"id":"me-guid","providerDisplayName":"Alessandro Torrisi"}}"#)
-        let name = try await makeProvider(http).currentUserDisplayName()
+        http.on("_apis/projects", body: projects)
+        let name = try await makeProvider(http).testConnection()
         #expect(name == "Alessandro Torrisi")
+        #expect(http.requests.contains { $0.url!.absoluteString.contains("_apis/projects") })
+    }
+
+    @Test func testConnectionReportsNoAccessWhenOrganizationRejectsToken() async {
+        // connectionData is not organization-scoped: it succeeds for any org name.
+        let http = MockHTTPClient()
+        http.on("connectionData", body: #"{"authenticatedUser":{"id":"me-guid","providerDisplayName":"Alessandro Torrisi"}}"#)
+        http.on("_apis/projects", status: 401, body: "")
+        let provider = makeProvider(http)
+        await #expect(throws: ProviderError.noAccess("acme")) { try await provider.testConnection() }
+    }
+
+    @Test func anonymousIdentityMeansUnauthorized() async {
+        // Azure DevOps answers connectionData with an anonymous user when the token is not accepted.
+        let http = MockHTTPClient()
+        http.on("connectionData", body: #"{"authenticatedUser":{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","providerDisplayName":"Anonymous"}}"#)
+        let provider = makeProvider(http)
+        await #expect(throws: ProviderError.unauthorized) { try await provider.currentUserId() }
+        await #expect(throws: ProviderError.unauthorized) { try await provider.testConnection() }
     }
 
     @Test func paginatesWithSkip() async throws {

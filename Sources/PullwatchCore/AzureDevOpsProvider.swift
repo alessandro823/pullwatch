@@ -31,13 +31,28 @@ public actor AzureDevOpsProvider: PRProvider {
     }
 
     public func currentUserId() async throws -> String {
-        let data: ConnectionData = try await get(baseURL.appending(path: "_apis/connectionData"), apiVersion: "7.1-preview")
-        return data.authenticatedUser.id
+        try await authenticatedUser().id
     }
 
-    public func currentUserDisplayName() async throws -> String {
+    public func testConnection() async throws -> String {
+        let user = try await authenticatedUser()
+        // connectionData is niet organisatie-gebonden; een org-endpoint bewijst pas toegang.
+        do {
+            let _: ValueList<ProjectDTO> = try await get(
+                baseURL.appending(path: "_apis/projects"),
+                query: [URLQueryItem(name: "$top", value: "1")]
+            )
+        } catch ProviderError.unauthorized {
+            throw ProviderError.noAccess(organization)
+        }
+        return user.providerDisplayName ?? user.id
+    }
+
+    /// Azure DevOps beantwoordt connectionData met een anonieme gebruiker als het token niet geaccepteerd wordt.
+    private func authenticatedUser() async throws -> ConnectionData.User {
         let data: ConnectionData = try await get(baseURL.appending(path: "_apis/connectionData"), apiVersion: "7.1-preview")
-        return data.authenticatedUser.providerDisplayName ?? data.authenticatedUser.id
+        guard data.authenticatedUser.id != ConnectionData.anonymousUserId else { throw ProviderError.unauthorized }
+        return data.authenticatedUser
     }
 
     public func listRepos() async throws -> [String] {
@@ -142,6 +157,8 @@ private struct ValueList<T: Decodable>: Decodable {
 }
 
 private struct ConnectionData: Decodable {
+    static let anonymousUserId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
     struct User: Decodable {
         let id: String
         let providerDisplayName: String?

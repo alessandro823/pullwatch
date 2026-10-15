@@ -9,6 +9,7 @@ public enum ProviderError: Error, Equatable, Sendable {
     case cliNotFound(String)
     case cliNotLoggedIn(String)
     case missingToken
+    case noAccess(String)
 
     public var userMessage: String {
         switch self {
@@ -28,6 +29,8 @@ public enum ProviderError: Error, Equatable, Sendable {
             return "Niet ingelogd, voer `\(name == "az" ? "az login" : "gh auth login")` uit"
         case .missingToken:
             return "Geen token ingesteld"
+        case .noAccess(let name):
+            return "Geen toegang tot \"\(name)\", controleer de naam"
         }
     }
 }

@@ -32,8 +32,14 @@ public actor GitHubProvider: PRProvider {
         return user.login
     }
 
-    public func currentUserDisplayName() async throws -> String {
-        try await currentUserId()
+    public func testConnection() async throws -> String {
+        let login = try await currentUserId()
+        do {
+            _ = try await resolveOwnerKind()
+        } catch ProviderError.server(status: 404) {
+            throw ProviderError.noAccess(owner)
+        }
+        return login
     }
 
     public func listRepos() async throws -> [String] {

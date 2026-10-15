@@ -16,7 +16,7 @@ actor MockProvider: PRProvider {
         return userId
     }
 
-    func currentUserDisplayName() async throws -> String {
+    func testConnection() async throws -> String {
         if let error { throw error }
         return userId
     }
@@ -48,7 +48,7 @@ actor GatedProvider: PRProvider {
     func release() { gateContinuation.yield() }
 
     func currentUserId() async throws -> String { "me" }
-    func currentUserDisplayName() async throws -> String { "me" }
+    func testConnection() async throws -> String { "me" }
     func listRepos() async throws -> [String] { [] }
 
     func openPullRequests() async throws -> [PullRequest] {

@@ -3,8 +3,9 @@ import Foundation
 public protocol PRProvider: Sendable {
     /// Identiteit van de ingelogde gebruiker, vergeleken met `PullRequest.authorId`.
     func currentUserId() async throws -> String
-    /// Weergavenaam van de ingelogde gebruiker (voor de verbindingstest).
-    func currentUserDisplayName() async throws -> String
+    /// Verbindingstest: controleert token én toegang tot de organisatie/owner,
+    /// en geeft de weergavenaam van de ingelogde gebruiker.
+    func testConnection() async throws -> String
     /// Alle repos die het account kan zien, in hetzelfde formaat als `Account.repos`.
     func listRepos() async throws -> [String]
     /// Alle open PR's inclusief drafts, ongefilterd.
