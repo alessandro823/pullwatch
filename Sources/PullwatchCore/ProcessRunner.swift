@@ -83,21 +83,26 @@ private final class ProcessRun: @unchecked Sendable {
                 didTerminate(finishedProcess.terminationStatus)
             }
 
+            // Beide readers moeten al geregistreerd zijn vóór launch: terminationHandler kan
+            // op een andere thread vuren voordat start() klaar is.
+            readers.enter()
+            readers.enter()
             do {
                 try process.run()
             } catch {
+                readers.leave()
+                readers.leave()
+                process.terminationHandler = nil
                 finishLocked(.failure(error))
                 return
             }
 
             // Pipes concurrent leegtrekken, anders blokkeert een grote output het proces.
-            readers.enter()
             DispatchQueue.global().async { [self] in
                 let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                 lock.withLock { stdoutData = data }
                 readers.leave()
             }
-            readers.enter()
             DispatchQueue.global().async { [self] in
                 let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                 lock.withLock { stderrData = data }
