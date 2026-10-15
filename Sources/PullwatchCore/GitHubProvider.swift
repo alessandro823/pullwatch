@@ -32,6 +32,10 @@ public actor GitHubProvider: PRProvider {
         return user.login
     }
 
+    public func currentUserDisplayName() async throws -> String {
+        try await currentUserId()
+    }
+
     public func listRepos() async throws -> [String] {
         let url: URL
         var query: [URLQueryItem] = []

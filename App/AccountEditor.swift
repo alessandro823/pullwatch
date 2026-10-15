@@ -154,9 +154,9 @@ struct AccountEditor: View {
         connectionMessage = "Bezig…"
         defer { testTask = nil }
         do {
-            let id = try await provider().currentUserId()
+            let name = try await provider().currentUserDisplayName()
             if Task.isCancelled { return }
-            connectionMessage = "✓ Verbonden (\(id))"
+            connectionMessage = "✓ Verbonden als \(name)"
         } catch let error as ProviderError {
             if Task.isCancelled { return }
             connectionMessage = "✗ \(error.userMessage)"

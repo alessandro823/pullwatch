@@ -38,7 +38,11 @@ struct MenuView: View {
             if !model.config.accounts.isEmpty {
                 Divider()
                 ForEach(model.config.accounts) { account in
-                    AccountStatusRow(account: account, state: model.statuses[account.id] ?? .idle)
+                    AccountStatusRow(
+                        account: account,
+                        state: model.statuses[account.id] ?? .idle,
+                        isConfigured: model.config.pollableAccounts.contains { $0.id == account.id }
+                    )
                 }
             }
 
@@ -83,7 +87,7 @@ private struct RecentRow: View {
                     Text(item.pullRequest.title).lineLimit(1)
                     HStack(spacing: 4) {
                         Text("\(item.pullRequest.repo) · \(item.pullRequest.authorName) ·")
-                        Text(item.pullRequest.createdAt, format: .relative(presentation: .named))
+                        Text(item.detectedAt, format: .relative(presentation: .named))
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -99,11 +103,14 @@ private struct RecentRow: View {
 private struct AccountStatusRow: View {
     let account: Account
     let state: AccountState
+    let isConfigured: Bool
 
     var body: some View {
         HStack(spacing: 4) {
             Text(account.displayName).font(.caption.bold())
             switch state {
+            case .idle where !isConfigured:
+                Text("niet geconfigureerd").font(.caption).foregroundStyle(.secondary)
             case .idle:
                 Text("wacht op eerste poll").font(.caption).foregroundStyle(.secondary)
             case .ok(let lastPoll):

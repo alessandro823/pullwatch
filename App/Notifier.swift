@@ -23,6 +23,15 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    func isAuthorized() async -> Bool {
+        await Self.authorizationGranted()
+    }
+
+    private nonisolated static func authorizationGranted() async -> Bool {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        return status == .authorized || status == .provisional
+    }
+
     func deliver(_ plans: [PlannedNotification]) {
         for plan in plans {
             let content = UNMutableNotificationContent()

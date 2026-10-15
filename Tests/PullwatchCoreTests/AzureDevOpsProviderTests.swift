@@ -73,6 +73,13 @@ import Testing
         #expect(http.requests.first?.value(forHTTPHeaderField: "Authorization") == "Bearer jwt")
     }
 
+    @Test func displayNameComesFromProviderDisplayName() async throws {
+        let http = MockHTTPClient()
+        http.on("connectionData", body: #"{"authenticatedUser":{"id":"me-guid","providerDisplayName":"Alessandro Torrisi"}}"#)
+        let name = try await makeProvider(http).currentUserDisplayName()
+        #expect(name == "Alessandro Torrisi")
+    }
+
     @Test func paginatesWithSkip() async throws {
         let http = MockHTTPClient()
         http.on("_apis/projects", body: projects)

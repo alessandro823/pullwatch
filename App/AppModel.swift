@@ -49,12 +49,20 @@ final class AppModel {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in await self?.refreshNow() }
+            // Wi-Fi is vlak na het ontwaken nog niet terug; wacht om een vals "Netwerkfout" te voorkomen.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(10))
+                await self?.refreshNow()
+            }
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+            self.notificationsAllowed = await self.notifier.requestAuthorization()
         }
 
         loopTask = Task { [weak self] in
             guard let self else { return }
-            self.notificationsAllowed = await self.notifier.requestAuthorization()
             while !Task.isCancelled {
                 await self.tick()
                 try? await Task.sleep(for: .seconds(15))
@@ -121,9 +129,11 @@ final class AppModel {
     func setPollInterval(_ seconds: Int) {
         config.pollInterval = seconds
         saveConfig()
+        Task { await refreshNow() }
     }
 
     private func tick() async {
+        notificationsAllowed = await notifier.isAuthorized()
         let result = await engine.poll(
             accounts: config.pollableAccounts,
             interval: TimeInterval(config.clampedInterval)

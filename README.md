@@ -29,8 +29,14 @@ Aanroepen van `az` en `gh` time-outen na 20 seconden.
 
 ### PAT-scopes
 
-- Azure DevOps: **Code (Read)**
+- Azure DevOps: **Code (Read)** en **Project and Team (Read)** (de projectenlijst komt van `/_apis/projects`)
 - GitHub (fine-grained): **Pull requests: Read** en **Metadata: Read** op de gewenste repos; classic: `repo`
+
+## Bekende eigenaardigheden
+
+- Door ad-hoc signing kan macOS na elke `make install` opnieuw om Keychain-toegang vragen voor PAT-accounts; kies "Altijd toestaan".
+- Bij de eerste start vraagt Pullwatch om toestemming voor meldingen.
+- `make run` herstart een al draaiende Pullwatch niet; sluit hem eerst af via het menu "Stop".
 
 ## Data
 

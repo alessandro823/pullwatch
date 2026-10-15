@@ -35,6 +35,11 @@ public actor AzureDevOpsProvider: PRProvider {
         return data.authenticatedUser.id
     }
 
+    public func currentUserDisplayName() async throws -> String {
+        let data: ConnectionData = try await get(baseURL.appending(path: "_apis/connectionData"), apiVersion: "7.1-preview")
+        return data.authenticatedUser.providerDisplayName ?? data.authenticatedUser.id
+    }
+
     public func listRepos() async throws -> [String] {
         var result: [String] = []
         for project in try await projects() {
@@ -137,7 +142,10 @@ private struct ValueList<T: Decodable>: Decodable {
 }
 
 private struct ConnectionData: Decodable {
-    struct User: Decodable { let id: String }
+    struct User: Decodable {
+        let id: String
+        let providerDisplayName: String?
+    }
     let authenticatedUser: User
 }
 

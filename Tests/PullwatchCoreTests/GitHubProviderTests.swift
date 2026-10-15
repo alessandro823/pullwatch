@@ -58,6 +58,12 @@ import Testing
         #expect(try await makeProvider(http).openPullRequests().first?.isDraft == false)
     }
 
+    @Test func displayNameIsLogin() async throws {
+        let http = MockHTTPClient()
+        http.on("github.com/user", body: #"{"login":"alessandro"}"#)
+        #expect(try await makeProvider(http).currentUserDisplayName() == "alessandro")
+    }
+
     @Test func sendsBearerAndGitHubHeaders() async throws {
         let http = MockHTTPClient()
         http.on("github.com/user", body: #"{"login":"alessandro"}"#)
