@@ -88,10 +88,14 @@ private struct GeneralSettingsView: View {
 
     private let intervals = [60, 120, 300, 600, 900]
 
+    private func nearestInterval(_ value: Int) -> Int {
+        intervals.min { abs($0 - value) < abs($1 - value) } ?? value
+    }
+
     var body: some View {
         Form {
             Picker("Poll-interval", selection: Binding(
-                get: { model.config.clampedInterval },
+                get: { nearestInterval(model.config.clampedInterval) },
                 set: { model.setPollInterval($0) }
             )) {
                 ForEach(intervals, id: \.self) { seconds in

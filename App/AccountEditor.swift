@@ -11,6 +11,10 @@ struct AccountEditor: View {
     @State private var repoSearch = ""
     @State private var repoError: String?
     @State private var loadingRepos = false
+    @State private var storedPAT = false
+    @State private var saveError: String?
+    @State private var testTask: Task<Void, Never>?
+    @State private var reposTask: Task<Void, Never>?
 
     init(model: AppModel, original: Account) {
         self.model = model
@@ -28,12 +32,16 @@ struct AccountEditor: View {
                 }
                 if draft.authMethod == .pat {
                     SecureField(
-                        model.hasStoredPAT(draft.id) ? "Opgeslagen — leeg laten om te behouden" : "Token",
+                        storedPAT ? "Opgeslagen — leeg laten om te behouden" : "Token",
                         text: $pat
                     )
                 }
                 HStack {
-                    Button("Test verbinding") { Task { await testConnection() } }
+                    Button("Test verbinding") {
+                        testTask?.cancel()
+                        testTask = Task { await testConnection() }
+                    }
+                    .disabled(!hasRequiredFields || testTask != nil)
                     if let connectionMessage {
                         Text(connectionMessage).font(.caption)
                     }
@@ -54,8 +62,11 @@ struct AccountEditor: View {
 
                 HStack {
                     TextField("Zoeken", text: $repoSearch)
-                    Button(loadingRepos ? "Laden…" : "Repos laden") { Task { await loadRepos() } }
-                        .disabled(loadingRepos)
+                    Button(loadingRepos ? "Laden…" : "Repos laden") {
+                        reposTask?.cancel()
+                        reposTask = Task { await loadRepos() }
+                    }
+                    .disabled(!hasRequiredFields || reposTask != nil)
                 }
                 if let repoError {
                     Text(repoError).font(.caption).foregroundStyle(.red)
@@ -71,16 +82,48 @@ struct AccountEditor: View {
                 .frame(minHeight: 140)
             }
 
-            HStack {
-                Spacer()
-                Button("Opslaan") {
-                    model.saveAccount(draft, pat: pat.isEmpty ? nil : pat)
-                    pat = ""
+            VStack(alignment: .trailing, spacing: 4) {
+                if let validationMessage {
+                    Text(validationMessage).font(.caption).foregroundStyle(.secondary)
                 }
-                .keyboardShortcut(.defaultAction)
+                if let saveError {
+                    Text(saveError).font(.caption).foregroundStyle(.red)
+                }
+                HStack {
+                    Spacer()
+                    Button("Opslaan") { save() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(validationMessage != nil)
+                }
             }
         }
         .formStyle(.grouped)
+        .onAppear { storedPAT = model.hasStoredPAT(draft.id) }
+        .onDisappear {
+            testTask?.cancel()
+            reposTask?.cancel()
+        }
+    }
+
+    private var hasRequiredFields: Bool {
+        !draft.displayName.trimmingCharacters(in: .whitespaces).isEmpty
+            && !draft.organization.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var validationMessage: String? {
+        if !hasRequiredFields { return "Naam en organisatie zijn verplicht" }
+        if draft.authMethod == .pat && pat.isEmpty && !storedPAT { return "Vul een token in" }
+        return nil
+    }
+
+    private func save() {
+        if model.saveAccount(draft, pat: pat.isEmpty ? nil : pat) {
+            saveError = nil
+            pat = ""
+            storedPAT = draft.authMethod == .pat ? (storedPAT || model.hasStoredPAT(draft.id)) : false
+        } else {
+            saveError = "PAT opslaan in Keychain mislukt"
+        }
     }
 
     private var filteredRepos: [String] {
@@ -109,12 +152,16 @@ struct AccountEditor: View {
 
     private func testConnection() async {
         connectionMessage = "Bezig…"
+        defer { testTask = nil }
         do {
             let id = try await provider().currentUserId()
+            if Task.isCancelled { return }
             connectionMessage = "✓ Verbonden (\(id))"
         } catch let error as ProviderError {
+            if Task.isCancelled { return }
             connectionMessage = "✗ \(error.userMessage)"
         } catch {
+            if Task.isCancelled { return }
             connectionMessage = "✗ \(error.localizedDescription)"
         }
     }
@@ -122,12 +169,19 @@ struct AccountEditor: View {
     private func loadRepos() async {
         loadingRepos = true
         repoError = nil
-        defer { loadingRepos = false }
+        defer {
+            loadingRepos = false
+            reposTask = nil
+        }
         do {
-            availableRepos = try await provider().listRepos()
+            let repos = try await provider().listRepos()
+            if Task.isCancelled { return }
+            availableRepos = repos
         } catch let error as ProviderError {
+            if Task.isCancelled { return }
             repoError = error.userMessage
         } catch {
+            if Task.isCancelled { return }
             repoError = error.localizedDescription
         }
     }

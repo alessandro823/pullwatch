@@ -82,12 +82,17 @@ final class AppModel {
         saveRecent()
     }
 
-    func saveAccount(_ account: Account, pat: String?) {
-        if let pat, !pat.isEmpty {
+    /// Returns false (and changes nothing) when the PAT could not be written to the Keychain.
+    @discardableResult
+    func saveAccount(_ account: Account, pat: String?) -> Bool {
+        if account.authMethod == .cli {
+            try? secrets.delete(account: account.id.uuidString)
+        } else if let pat, !pat.isEmpty {
             do {
                 try secrets.write(pat, account: account.id.uuidString)
             } catch {
                 logger.error("PAT opslaan mislukt: \(error.localizedDescription)")
+                return false
             }
         }
         if let index = config.accounts.firstIndex(where: { $0.id == account.id }) {
@@ -97,6 +102,7 @@ final class AppModel {
         }
         saveConfig()
         Task { await refreshNow() }
+        return true
     }
 
     func removeAccount(_ id: UUID) {
