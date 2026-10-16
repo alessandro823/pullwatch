@@ -347,12 +347,67 @@ private struct Harness {
         #expect(try store.load()?.tagSeeded == ["\(account.id.uuidString):proj/a"])
     }
 
-    @Test func tagFetchErrorFailsAccount() async {
+    @Test func tagRepoCaseDiffersBetweenConfigAndProvider() async {
+        let account = Account.fixture(repoWatch: ["Proj/A": .both])
+        let h = Harness(accounts: [account])
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        let v2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
+    }
+
+    @Test func tagOnlyServerErrorKeepsPullRequestsFlowing() async {
         let account = Account.fixture(repoWatch: ["proj/a": .both])
         let h = Harness(accounts: [account])
-        await h.provider(account).set(error: .server(status: 500))
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        _ = await h.engine.poll(accounts: [account], interval: 120) // PR's en tags stil geseed
+
+        let pr = PullRequest.fixture(accountId: account.id, repo: "proj/a", number: 1)
+        await h.provider(account).set(pullRequests: [pr])
+        await h.provider(account).set(tagError: .server(status: 500))
+        h.clock.advance(900)
         let result = await h.engine.poll(accounts: [account], interval: 120)
-        #expect(result.statuses[account.id] == .failed(.server(status: 500), since: h.clock.now))
+        #expect(result.newPullRequests == [pr])
+        #expect(result.newTags.isEmpty)
+        #expect(result.statuses[account.id] == .ok(lastPoll: h.clock.now))
+        #expect(await h.provider(account).tagFetchCount == 2)
+
+        // PR is gemarkeerd: geen herhaalde melding; tags pas na 900 s opnieuw.
+        await h.provider(account).set(tagError: nil)
+        h.clock.advance(120)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newPullRequests.isEmpty)
+        #expect(await h.provider(account).tagFetchCount == 2)
+
+        // Tag-state is niet aangeraakt: repo blijft geseed, nieuwe tag wordt gemeld.
+        let v2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+        h.clock.advance(780)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
+        #expect(await h.provider(account).tagFetchCount == 3)
+    }
+
+    @Test func tagOnlyUnauthorizedFailsAccount() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        let pr = PullRequest.fixture(accountId: account.id, repo: "proj/a", number: 1)
+        await h.provider(account).set(pullRequests: [pr])
+        await h.provider(account).set(tagError: .unauthorized)
+        h.clock.advance(900)
+        let failed = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(failed.newPullRequests.isEmpty)
+        #expect(failed.authFailures == [account.id])
+        #expect(failed.statuses[account.id] == .failed(.unauthorized, since: h.clock.now))
+
+        await h.provider(account).set(tagError: nil)
+        await h.engine.forceRefresh()
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newPullRequests == [pr])
     }
 
     @Test func newTagsAreSortedByRepoThenName() async {

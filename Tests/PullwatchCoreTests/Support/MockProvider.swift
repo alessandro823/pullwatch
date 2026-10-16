@@ -5,6 +5,7 @@ actor MockProvider: PRProvider {
     private var userId = "me"
     private var pullRequests: [PullRequest] = []
     private var error: ProviderError?
+    private var tagError: ProviderError?
     private var tagList: [Tag] = []
     private(set) var fetchCount = 0
     private(set) var tagFetchCount = 0
@@ -13,6 +14,8 @@ actor MockProvider: PRProvider {
     func set(pullRequests: [PullRequest]) { self.pullRequests = pullRequests }
     func set(tags: [Tag]) { tagList = tags }
     func set(error: ProviderError?) { self.error = error }
+    /// Fout die alleen `tags(in:)` gooit.
+    func set(tagError: ProviderError?) { self.tagError = tagError }
 
     func currentUserId() async throws -> String {
         if let error { throw error }
@@ -35,6 +38,7 @@ actor MockProvider: PRProvider {
     func tags(in repos: [String]) async throws -> [Tag] {
         tagFetchCount += 1
         if let error { throw error }
+        if let tagError { throw tagError }
         let wanted = Set(repos.map { $0.lowercased() })
         return tagList.filter { wanted.contains($0.repo.lowercased()) }
     }

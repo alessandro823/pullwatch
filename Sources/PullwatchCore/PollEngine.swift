@@ -34,9 +34,11 @@ public actor PollEngine {
     private struct Fetched {
         let userId: String
         let pullRequests: [PullRequest]
-        /// `nil` als tags deze cyclus niet aan de beurt waren.
+        /// `nil` als tags deze cyclus niet aan de beurt waren of het ophalen mislukte.
         let tags: [Tag]?
         let tagRepos: [String]
+        /// Fout bij het ophalen van tags die het account niet laat falen (zie `fetchTags`).
+        let tagError: ProviderError?
     }
 
     private static let maxRateLimitWait: TimeInterval = 3600
@@ -156,12 +158,40 @@ public actor PollEngine {
                 userId = try await provider.currentUserId()
             }
             let pullRequests = try await provider.openPullRequests()
-            let tags = fetchTags ? try await provider.tags(in: tagRepos) : nil
-            return .success(Fetched(userId: userId, pullRequests: pullRequests, tags: tags, tagRepos: tagRepos))
+            var tags: [Tag]?
+            var tagError: ProviderError?
+            if fetchTags {
+                (tags, tagError) = try await Self.fetchTags(provider, in: tagRepos)
+            }
+            return .success(Fetched(
+                userId: userId,
+                pullRequests: pullRequests,
+                tags: tags,
+                tagRepos: tagRepos,
+                tagError: tagError
+            ))
         } catch let error as ProviderError {
             return .failure(error)
         } catch {
             return .failure(.network(error.localizedDescription))
+        }
+    }
+
+    /// Alleen `.unauthorized` en `.rateLimited` laten het account falen; andere tag-fouten
+    /// worden teruggegeven zodat de PR's van deze poll gewoon verwerkt worden.
+    private static func fetchTags(
+        _ provider: any PRProvider,
+        in repos: [String]
+    ) async throws -> (tags: [Tag]?, error: ProviderError?) {
+        do {
+            return (try await provider.tags(in: repos), nil)
+        } catch let error as ProviderError {
+            switch error {
+            case .unauthorized, .rateLimited: throw error
+            default: return (nil, error)
+            }
+        } catch {
+            return (nil, .network(error.localizedDescription))
         }
     }
 
@@ -209,8 +239,11 @@ public actor PollEngine {
         state.lastSettings[key] = settings
         userIds[account.id] = fetched.userId
         var schedule = Schedule(nextDue: t + interval, nextTagDue: schedules[account.id]?.nextTagDue ?? .distantPast)
-        if fetched.tags != nil {
+        if fetched.tags != nil || fetched.tagError != nil {
             schedule.nextTagDue = t + Self.tagInterval
+        }
+        if let tagError = fetched.tagError {
+            logger.warning("tags ophalen mislukt voor \(account.displayName, privacy: .public): \(tagError.userMessage, privacy: .public)")
         }
         schedules[account.id] = schedule
         statuses[account.id] = .ok(lastPoll: t)
@@ -219,6 +252,8 @@ public actor PollEngine {
 
     /// Eerste tag-poll per repo is stil; daarna wordt elke onbekende tag gemeld.
     private func handleTags(_ account: Account, _ fetched: Fetched, at t: Date) -> [Tag] {
+        // Mislukte tag-fetch: tag-state ongemoeid laten tot de volgende tag-poll.
+        guard fetched.tagError == nil else { return [] }
         let prefix = "\(account.id.uuidString):"
         // Repo's waarvan tags uit staan vergeten, zodat weer aanzetten opnieuw stil seedt.
         let wantedKeys = Set(fetched.tagRepos.map { prefix + $0.lowercased() })
