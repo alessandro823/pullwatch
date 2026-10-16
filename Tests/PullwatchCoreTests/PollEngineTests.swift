@@ -391,7 +391,7 @@ private struct Harness {
         #expect(await h.provider(account).tagFetchCount == 3)
     }
 
-    @Test func tagOnlyUnauthorizedFailsAccount() async {
+    @Test func tagOnlyUnauthorizedKeepsPullRequestsFlowing() async {
         let account = Account.fixture(repoWatch: ["proj/a": .both])
         let h = Harness(accounts: [account])
         _ = await h.engine.poll(accounts: [account], interval: 120)
@@ -400,14 +400,32 @@ private struct Harness {
         await h.provider(account).set(pullRequests: [pr])
         await h.provider(account).set(tagError: .unauthorized)
         h.clock.advance(900)
-        let failed = await h.engine.poll(accounts: [account], interval: 120)
-        #expect(failed.newPullRequests.isEmpty)
-        #expect(failed.authFailures == [account.id])
-        #expect(failed.statuses[account.id] == .failed(.unauthorized, since: h.clock.now))
+        let result = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(result.newPullRequests == [pr])
+        #expect(result.authFailures.isEmpty)
+        #expect(result.statuses[account.id] == .ok(lastPoll: h.clock.now))
+        #expect(await h.provider(account).invalidateCount == 0)
+        #expect(await h.provider(account).tagFetchCount == 2)
 
-        await h.provider(account).set(tagError: nil)
-        await h.engine.forceRefresh()
-        #expect(await h.engine.poll(accounts: [account], interval: 120).newPullRequests == [pr])
+        // Tags pas na tagInterval opnieuw geprobeerd.
+        h.clock.advance(120)
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(await h.provider(account).tagFetchCount == 2)
+        h.clock.advance(780)
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(await h.provider(account).tagFetchCount == 3)
+    }
+
+    @Test func tagOnlyRateLimitFailsAccount() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        h.clock.advance(900)
+        let until = h.clock.now + 600
+        await h.provider(account).set(tagError: .rateLimited(until: until))
+        let result = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(result.statuses[account.id] == .failed(.rateLimited(until: until), since: h.clock.now))
     }
 
     @Test func newTagsAreSortedByRepoThenName() async {

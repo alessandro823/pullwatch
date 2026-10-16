@@ -177,8 +177,8 @@ public actor PollEngine {
         }
     }
 
-    /// Alleen `.unauthorized` en `.rateLimited` laten het account falen; andere tag-fouten
-    /// worden teruggegeven zodat de PR's van deze poll gewoon verwerkt worden.
+    /// Alleen `.rateLimited` laat het account falen; andere tag-fouten (ook `.unauthorized`,
+    /// bv. een 403 op één repo) worden teruggegeven zodat de PR's van deze poll gewoon verwerkt worden.
     private static func fetchTags(
         _ provider: any PRProvider,
         in repos: [String]
@@ -187,7 +187,7 @@ public actor PollEngine {
             return (try await provider.tags(in: repos), nil)
         } catch let error as ProviderError {
             switch error {
-            case .unauthorized, .rateLimited: throw error
+            case .rateLimited: throw error
             default: return (nil, error)
             }
         } catch {

@@ -104,6 +104,8 @@ public actor AzureDevOpsProvider: PRProvider {
                 )
             } catch ProviderError.server(status: 404) {
                 continue // repo bestaat niet (meer): geen tags
+            } catch ProviderError.unauthorized {
+                continue // geen toegang tot deze repo (403: SSO, rechten, IP-allowlist): overslaan, andere repo's gaan door
             }
             for ref in list.value {
                 let tagName = ref.name.hasPrefix("refs/tags/") ? String(ref.name.dropFirst("refs/tags/".count)) : ref.name

@@ -155,9 +155,21 @@ import Testing
         #expect(tags.isEmpty)
     }
 
+    @Test func forbiddenRepoIsSkippedOthersStillYieldTags() async throws {
+        let http = MockHTTPClient()
+        // 403 zonder rate-limit-headers (SSO, rechten, IP-allowlist) → .unauthorized.
+        http.on("repos/acme/secret/tags", status: 403, body: #"{"message":"Resource protected by organization SAML enforcement"}"#)
+        http.on("repos/acme/api/tags", body: #"[{"name":"v1"}]"#)
+
+        let tags = try await makeProvider(http).tags(in: ["acme/secret", "acme/api"])
+
+        #expect(tags.map(\.name) == ["v1"])
+        #expect(tags.allSatisfy { $0.repo == "acme/api" })
+    }
+
     @Test func tagRequestFailureOtherThanNotFoundPropagates() async throws {
         let http = MockHTTPClient()
-        http.on("repos/acme/api/tags", status: 401, body: "{}")
+        http.on("repos/acme/api/tags", status: 500, body: "{}")
 
         await #expect(throws: ProviderError.self) {
             _ = try await makeProvider(http).tags(in: ["acme/api"])

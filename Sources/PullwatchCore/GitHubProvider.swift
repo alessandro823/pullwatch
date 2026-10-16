@@ -108,6 +108,8 @@ public actor GitHubProvider: PRProvider {
                 }
             } catch ProviderError.server(status: 404) {
                 continue // repo bestaat niet (meer): geen tags
+            } catch ProviderError.unauthorized {
+                continue // geen toegang tot deze repo (403: SSO, rechten, IP-allowlist): overslaan, andere repo's gaan door
             }
         }
         return result

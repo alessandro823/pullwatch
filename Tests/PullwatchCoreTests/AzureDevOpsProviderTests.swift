@@ -176,9 +176,20 @@ import Testing
         #expect(tags.isEmpty)
     }
 
+    @Test func forbiddenRepoIsSkippedOthersStillYieldTags() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/git/repositories/secret/refs", status: 403, body: "{}")
+        http.on("_apis/git/repositories/api/refs", body: #"{"value":[{"name":"refs/tags/v1"}]}"#)
+
+        let tags = try await makeProvider(http).tags(in: ["proj/secret", "proj/api"])
+
+        #expect(tags.map(\.name) == ["v1"])
+        #expect(tags.allSatisfy { $0.repo == "proj/api" })
+    }
+
     @Test func tagRequestFailureOtherThanNotFoundPropagates() async throws {
         let http = MockHTTPClient()
-        http.on("/refs", status: 401, body: "{}")
+        http.on("/refs", status: 500, body: "{}")
 
         await #expect(throws: ProviderError.self) {
             _ = try await makeProvider(http).tags(in: ["proj/api"])
