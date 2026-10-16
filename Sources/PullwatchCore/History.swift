@@ -160,3 +160,13 @@ public struct History: Codable, Equatable, Sendable {
         }
     }
 }
+
+extension History {
+    /// Kiest de beginstand bij het opstarten: `history.json` wint; anders wordt `recent.json` gemigreerd.
+    /// `needsSave` is `true` als de uitkomst nog naar `history.json` moet worden weggeschreven.
+    public static func initial(stored: History?, legacy: RecentList?) -> (history: History, needsSave: Bool) {
+        if let stored { return (stored, false) }
+        if let legacy { return (History(migrating: legacy), true) }
+        return (History(), false)
+    }
+}

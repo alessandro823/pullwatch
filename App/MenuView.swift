@@ -27,10 +27,10 @@ struct MenuView: View {
 
             Divider()
 
-            if model.recent.items.isEmpty {
+            if model.history.items.isEmpty {
                 Text("Nog geen nieuwe PR's").foregroundStyle(.secondary)
             } else {
-                ForEach(model.recent.items.prefix(10)) { item in
+                ForEach(model.history.items.prefix(10)) { item in
                     RecentRow(item: item) { model.open(item) }
                 }
             }
@@ -50,7 +50,7 @@ struct MenuView: View {
 
             HStack {
                 Button("Alles gelezen") { model.markAllRead() }
-                    .disabled(model.recent.unreadCount == 0)
+                    .disabled(model.history.unreadCount == 0)
                 Spacer()
                 SettingsButton()
                 Button("Stop") { NSApp.terminate(nil) }
@@ -73,7 +73,7 @@ struct SettingsButton: View {
 }
 
 private struct RecentRow: View {
-    let item: RecentItem
+    let item: HistoryItem
     let action: () -> Void
 
     var body: some View {
@@ -84,9 +84,9 @@ private struct RecentRow: View {
                     .frame(width: 6, height: 6)
                     .padding(.top, 6)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.pullRequest.title).lineLimit(1)
+                    Text(item.entry.title).lineLimit(1)
                     HStack(spacing: 4) {
-                        Text("\(item.pullRequest.repo) · \(item.pullRequest.authorName) ·")
+                        Text("\(item.entry.repo) · \(item.entry.author ?? "onbekend") ·")
                         Text(item.detectedAt, format: .relative(presentation: .named))
                     }
                     .font(.caption)

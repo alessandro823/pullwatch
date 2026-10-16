@@ -21,7 +21,7 @@ struct PullwatchApp: App {
         } label: {
             HStack(spacing: 2) {
                 Image(systemName: model.menuBarSymbol)
-                if model.recent.unreadCount > 0 {
+                if model.history.unreadCount > 0 {
                     Text("•")
                 }
             }

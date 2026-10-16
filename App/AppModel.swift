@@ -11,12 +11,13 @@ final class AppModel {
     static let shared = AppModel()
 
     private(set) var config: AppConfig
-    private(set) var recent: RecentList
+    private(set) var history: History
     private(set) var statuses: [UUID: AccountState] = [:]
     private(set) var notificationsAllowed = true
 
     @ObservationIgnored private let configStore = JSONFileStore<AppConfig>(url: AppPaths.file("config.json"))
-    @ObservationIgnored private let recentStore = JSONFileStore<RecentList>(url: AppPaths.file("recent.json"))
+    @ObservationIgnored private let historyStore = JSONFileStore<History>(url: AppPaths.file("history.json"))
+    @ObservationIgnored private let legacyRecentStore = JSONFileStore<RecentList>(url: AppPaths.file("recent.json"))
     @ObservationIgnored private let secrets = KeychainStore()
     @ObservationIgnored private let engine = PollEngine(
         makeProvider: { ProviderFactory.make($0) },
@@ -32,7 +33,20 @@ final class AppModel {
             logger.error("config onleesbaar: \(error.localizedDescription)")
             config = AppConfig()
         }
-        recent = (try? recentStore.load()) ?? RecentList()
+
+        let stored: History?
+        do {
+            stored = try historyStore.load()
+        } catch {
+            logger.error("history onleesbaar: \(error.localizedDescription)")
+            stored = nil
+        }
+        // recent.json blijft staan na migratie.
+        let initial = History.initial(stored: stored, legacy: try? legacyRecentStore.load())
+        history = initial.history
+        var needsSave = initial.needsSave
+        if history.prune(now: Date(), retention: config.historyRetention) { needsSave = true }
+        if needsSave { saveHistory() }
     }
 
     var menuBarSymbol: String {
@@ -75,19 +89,19 @@ final class AppModel {
         await tick()
     }
 
-    func open(_ item: RecentItem) {
-        NSWorkspace.shared.open(item.pullRequest.webURL)
+    func open(_ item: HistoryItem) {
+        NSWorkspace.shared.open(item.entry.webURL)
         markRead(item.id)
     }
 
     func markRead(_ key: String) {
-        recent.markRead(key)
-        saveRecent()
+        history.markRead(key)
+        saveHistory()
     }
 
     func markAllRead() {
-        recent.markAllRead()
-        saveRecent()
+        history.markAllRead()
+        saveHistory()
     }
 
     /// Returns false (and changes nothing) when the PAT could not be written to the Keychain.
@@ -116,10 +130,10 @@ final class AppModel {
     func removeAccount(_ id: UUID) {
         try? secrets.delete(account: id.uuidString)
         config.accounts.removeAll { $0.id == id }
-        recent.removeAccount(id)
+        history.removeAccount(id)
         statuses[id] = nil
         saveConfig()
-        saveRecent()
+        saveHistory()
     }
 
     func hasStoredPAT(_ id: UUID) -> Bool {
@@ -132,6 +146,12 @@ final class AppModel {
         Task { await refreshNow() }
     }
 
+    func setHistoryRetention(_ retention: HistoryRetention) {
+        config.historyRetention = retention
+        saveConfig()
+        if history.prune(now: Date(), retention: retention) { saveHistory() }
+    }
+
     private func tick() async {
         notificationsAllowed = await notifier.isAuthorized()
         let result = await engine.poll(
@@ -140,10 +160,12 @@ final class AppModel {
         )
         statuses = result.statuses
 
-        if !result.newPullRequests.isEmpty {
-            recent.add(result.newPullRequests, at: Date())
-            saveRecent()
-            notifier.deliver(NotificationPlanner.plan(pullRequests: result.newPullRequests, tags: []))
+        if !result.newPullRequests.isEmpty || !result.newTags.isEmpty {
+            let now = Date()
+            history.add(pullRequests: result.newPullRequests, tags: result.newTags, at: now)
+            history.prune(now: now, retention: config.historyRetention)
+            saveHistory()
+            notifier.deliver(NotificationPlanner.plan(pullRequests: result.newPullRequests, tags: result.newTags))
         }
         for id in result.authFailures {
             if let account = config.accounts.first(where: { $0.id == id }) {
@@ -160,11 +182,11 @@ final class AppModel {
         }
     }
 
-    private func saveRecent() {
+    private func saveHistory() {
         do {
-            try recentStore.save(recent)
+            try historyStore.save(history)
         } catch {
-            logger.error("recent opslaan mislukt: \(error.localizedDescription)")
+            logger.error("history opslaan mislukt: \(error.localizedDescription)")
         }
     }
 }

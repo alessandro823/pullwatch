@@ -118,3 +118,29 @@ import Testing
         #expect(try JSONDecoder().decode(History.self, from: data) == history)
     }
 }
+
+@Suite("History opstarten")
+struct HistoryInitialTests {
+    @Test func opgeslagenGeschiedenisWintVanLegacy() {
+        let stored = History()
+        var legacy = RecentList()
+        legacy.add([.fixture(number: 1)], at: Date())
+        let result = History.initial(stored: stored, legacy: legacy)
+        #expect(result.history.items.isEmpty)
+        #expect(!result.needsSave)
+    }
+
+    @Test func legacyWordtGemigreerdEnMoetOpgeslagen() {
+        var legacy = RecentList()
+        legacy.add([.fixture(number: 1)], at: Date())
+        let result = History.initial(stored: nil, legacy: legacy)
+        #expect(result.history.items.count == 1)
+        #expect(result.needsSave)
+    }
+
+    @Test func nietsGeeftLeegZonderOpslaan() {
+        let result = History.initial(stored: nil, legacy: nil)
+        #expect(result.history.items.isEmpty)
+        #expect(!result.needsSave)
+    }
+}
