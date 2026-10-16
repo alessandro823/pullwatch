@@ -209,4 +209,62 @@ import Testing
         #expect(url.contains("filter=tags/"))
         #expect(url.contains("api-version=7.1"))
     }
+
+    func syncPR(id: Int, status: String, closed: String? = nil) -> String {
+        let closedField = closed.map { #","closedDate":"\#($0)""# } ?? ""
+        return #"""
+        {"pullRequestId":\#(id),"title":"PR \#(id)","creationDate":"2025-10-15T10:00:00Z","status":"\#(status)"\#(closedField),
+         "createdBy":{"id":"user-guid","displayName":"Jan Jansen"},
+         "repository":{"name":"api","project":{"name":"My Project"}}}
+        """#
+    }
+
+    @Test func syncMapsStates() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/projects", body: projects)
+        http.on("_apis/git/pullrequests", body: #"""
+        {"value":[\#(syncPR(id: 1, status: "active")),
+        \#(syncPR(id: 2, status: "completed", closed: "2025-10-16T09:00:00Z")),
+        \#(syncPR(id: 3, status: "abandoned", closed: "2025-10-16T08:00:00Z"))]}
+        """#)
+
+        let prs = try await makeProvider(http).pullRequests(updatedSince: nil, limit: 1000)
+
+        #expect(Set(prs.map(\.number)) == [1, 2, 3])
+        let byNumber = Dictionary(uniqueKeysWithValues: prs.map { ($0.number, $0) })
+        #expect(byNumber[1]?.state == .open)
+        #expect(byNumber[2]?.state == .merged)
+        #expect(byNumber[3]?.state == .closed)
+        #expect(byNumber[1]?.closedAt == nil)
+        #expect(byNumber[2]?.closedAt == Date(timeIntervalSince1970: 1_760_605_200))
+    }
+
+    @Test func syncMergesCreatedAndClosedWithoutDuplicates() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/projects", body: projects)
+        http.on("queryTimeRangeType=created", body: #"{"value":[\#(syncPR(id: 1, status: "active")),\#(syncPR(id: 2, status: "active"))]}"#)
+        http.on("queryTimeRangeType=closed", body: #"{"value":[\#(syncPR(id: 2, status: "completed")),\#(syncPR(id: 3, status: "abandoned"))]}"#)
+
+        let prs = try await makeProvider(http).pullRequests(updatedSince: Date(timeIntervalSince1970: 1_760_000_000), limit: 1000)
+
+        #expect(prs.map(\.number).sorted() == [1, 2, 3])
+        let prRequests = http.requests.map(\.url!.absoluteString).filter { $0.contains("_apis/git/pullrequests") }
+        #expect(prRequests.count == 2)
+        for url in prRequests {
+            #expect(url.contains("searchCriteria.minTime=2025-10-09T08:53:20Z") || url.contains("searchCriteria.minTime=2025-10-09T08%3A53%3A20Z"))
+            #expect(url.contains("searchCriteria.status=all"))
+        }
+    }
+
+    @Test func syncWithoutSinceUsesSingleQuery() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/projects", body: projects)
+        http.on("_apis/git/pullrequests", body: #"{"value":[\#(syncPR(id: 1, status: "active"))]}"#)
+
+        _ = try await makeProvider(http).pullRequests(updatedSince: nil, limit: 1000)
+
+        let prRequests = http.requests.map(\.url!.absoluteString).filter { $0.contains("_apis/git/pullrequests") }
+        #expect(prRequests.count == 1)
+        #expect(!prRequests[0].contains("queryTimeRangeType"))
+    }
 }

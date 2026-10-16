@@ -89,6 +89,48 @@ public actor AzureDevOpsProvider: PRProvider {
         return result
     }
 
+    public func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] {
+        var byId: [Int: PullRequest] = [:]
+        for project in try await projects() {
+            // Met `since` twee reeksen: recent aangemaakt en recent gesloten; zonder `since` één reeks.
+            let ranges: [String?] = since == nil ? [nil] : ["created", "closed"]
+            for range in ranges {
+                var skip = 0
+                while true {
+                    var query = [
+                        URLQueryItem(name: "searchCriteria.status", value: "all"),
+                        URLQueryItem(name: "$top", value: String(pageSize)),
+                        URLQueryItem(name: "$skip", value: String(skip)),
+                    ]
+                    if let range, let since {
+                        query += [
+                            URLQueryItem(name: "searchCriteria.queryTimeRangeType", value: range),
+                            URLQueryItem(name: "searchCriteria.minTime", value: since.formatted(Date.ISO8601FormatStyle(timeZone: .gmt))),
+                        ]
+                    }
+                    let page: ValueList<PullRequestDTO>
+                    do {
+                        page = try await get(
+                            baseURL.appending(path: project).appending(path: "_apis/git/pullrequests"),
+                            query: query
+                        )
+                    } catch ProviderError.server(status: 404) {
+                        break // project bestaat niet (meer)
+                    }
+                    for dto in page.value {
+                        byId[dto.pullRequestId] = try makePullRequest(dto)
+                    }
+                    if page.value.count < pageSize { break }
+                    skip += pageSize
+                    // Zonder `since` is er één reeks en kan hier worden gestopt.
+                    if since == nil && byId.count >= limit { break }
+                }
+            }
+            if since == nil && byId.count >= limit { break }
+        }
+        return Array(byId.values.sorted { $0.createdAt > $1.createdAt }.prefix(limit))
+    }
+
     public func tags(in repos: [String]) async throws -> TagFetch {
         var result: [Tag] = []
         var unavailable: [String] = []
@@ -156,6 +198,12 @@ public actor AzureDevOpsProvider: PRProvider {
             throw ProviderError.decoding("creationDate \(dto.creationDate)")
         }
         let project = dto.repository.project.name
+        let state: PRState
+        switch dto.status {
+        case "completed": state = .merged
+        case "abandoned": state = .closed
+        default: state = .open
+        }
         let webURL = baseURL
             .appending(path: project)
             .appending(path: "_git")
@@ -171,7 +219,9 @@ public actor AzureDevOpsProvider: PRProvider {
             authorName: dto.createdBy.displayName,
             isDraft: dto.isDraft ?? false,
             createdAt: createdAt,
-            webURL: webURL
+            webURL: webURL,
+            state: state,
+            closedAt: dto.closedDate.flatMap(DateParsing.parse)
         )
     }
 
@@ -233,6 +283,8 @@ private struct PullRequestDTO: Decodable {
     let pullRequestId: Int
     let title: String
     let isDraft: Bool?
+    let status: String?
+    let closedDate: String?
     let creationDate: String
     let createdBy: Identity
     let repository: Repository
