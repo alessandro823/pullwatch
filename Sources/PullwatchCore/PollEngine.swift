@@ -257,21 +257,21 @@ public actor PollEngine {
         let prefix = "\(account.id.uuidString):"
         // Repo's waarvan tags uit staan vergeten, zodat weer aanzetten opnieuw stil seedt.
         let wantedKeys = Set(fetched.tagRepos.map { prefix + $0.lowercased() })
-        state.tagSeeded = state.tagSeeded.filter { !$0.hasPrefix(prefix) || wantedKeys.contains($0) }
+        state.tagSeeded = state.tagSeeded.filter { !$0.key.hasPrefix(prefix) || wantedKeys.contains($0.key) }
 
         guard let tags = fetched.tags else { return [] }
         let tagsByRepo = Dictionary(grouping: tags) { $0.repo.lowercased() }
         var fresh: [Tag] = []
         for repo in Set(fetched.tagRepos.map { $0.lowercased() }) {
             let seededKey = prefix + repo
-            let isSeeded = state.tagSeeded.contains(seededKey)
+            let isSeeded = state.tagSeeded[seededKey] != nil
             for tag in tagsByRepo[repo] ?? [] {
                 if isSeeded, !state.contains(tag.dedupKey) {
                     fresh.append(tag)
                 }
                 state.mark(tag.dedupKey, at: t)
             }
-            state.tagSeeded.insert(seededKey)
+            state.tagSeeded[seededKey] = t
         }
         return fresh
     }

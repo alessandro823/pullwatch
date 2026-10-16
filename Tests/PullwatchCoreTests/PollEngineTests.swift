@@ -344,7 +344,7 @@ private struct Harness {
         await h.provider(account).set(tags: [v1, v2])
         h.clock.advance(900)
         #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
-        #expect(try store.load()?.tagSeeded == ["\(account.id.uuidString):proj/a"])
+        #expect(try store.load()?.tagSeeded.keys.sorted() == ["\(account.id.uuidString):proj/a"])
     }
 
     @Test func tagRepoCaseDiffersBetweenConfigAndProvider() async {
@@ -426,6 +426,31 @@ private struct Harness {
         await h.provider(account).set(tagError: .rateLimited(until: until))
         let result = await h.engine.poll(accounts: [account], interval: 120)
         #expect(result.statuses[account.id] == .failed(.rateLimited(until: until), since: h.clock.now))
+    }
+
+    @Test func longTagOutageReseedsSilentlyAfterRecovery() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        _ = await h.engine.poll(accounts: [account], interval: 120) // tags stil geseed
+
+        // 31 dagen lang slagen de PR-polls maar falen de tags.
+        await h.provider(account).set(tagError: .server(status: 500))
+        for _ in 1...31 {
+            h.clock.advance(day)
+            #expect(await h.engine.poll(accounts: [account], interval: 120).statuses[account.id] == .ok(lastPoll: h.clock.now))
+        }
+
+        // Herstel: bestaande tags niet opnieuw melden, daarna wel nieuwe tags.
+        await h.provider(account).set(tagError: nil)
+        h.clock.advance(day)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        let v2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
     }
 
     @Test func newTagsAreSortedByRepoThenName() async {

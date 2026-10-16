@@ -54,6 +54,24 @@ import Testing
         #expect(state.seen.isEmpty)
     }
 
+    @Test func pruneAlsoDropsStaleTagSeeded() {
+        var state = SeenState()
+        state.tagSeeded["a:old"] = t0
+        state.tagSeeded["a:recent"] = t0 + 25 * day
+        state.tagSeeded["b:old"] = t0
+        state.prune(now: t0 + 31 * day, onlyKeyPrefixes: ["a:"])
+        #expect(state.tagSeeded.keys.sorted() == ["a:recent", "b:old"])
+        state.prune(now: t0 + 31 * day)
+        #expect(state.tagSeeded.keys.sorted() == ["a:recent"])
+    }
+
+    @Test func tagSeededRoundTrips() throws {
+        var state = SeenState()
+        state.tagSeeded["a:proj/x"] = t0
+        let data = try JSONEncoder().encode(state)
+        #expect(try JSONDecoder().decode(SeenState.self, from: data) == state)
+    }
+
     @Test func legacySeenJsonLoads() throws {
         let json = Data(#"{"seen":{},"lastSettings":{}}"#.utf8)
         let state = try JSONDecoder().decode(SeenState.self, from: json)
