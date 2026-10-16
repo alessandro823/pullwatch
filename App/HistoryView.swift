@@ -18,6 +18,8 @@ struct HistoryView: View {
 
     @State private var searchText = ""
     @State private var filter: Filter = .all
+    // Zonder selectie-binding vuurt de primaryAction (dubbelklik) van contextMenu niet.
+    @State private var selection = Set<HistoryItem.ID>()
 
     private var items: [HistoryItem] {
         model.history.search(searchText, kind: filter.kind)
@@ -38,7 +40,7 @@ struct HistoryView: View {
                 .fixedSize()
             }
 
-            Table(items) {
+            Table(items, selection: $selection) {
                 TableColumn("Type") { item in
                     KindPill(kind: item.entry.kind)
                 }
