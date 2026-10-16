@@ -119,4 +119,48 @@ import Testing
         http.on("users/acme", body: #"{"type":"Organization"}"#)
         #expect(try await makeProvider(http).openPullRequests().count == 101)
     }
+
+    // MARK: - Tags
+
+    @Test func parsesTagsAcrossPages() async throws {
+        let http = MockHTTPClient()
+        let page1 = (1...100).map { #"{"name":"v\#($0)"}"# }.joined(separator: ",")
+        http.on("page=2", body: #"[{"name":"v101"}]"#)
+        http.on("repos/acme/api/tags", body: "[\(page1)]")
+
+        let tags = try await makeProvider(http).tags(in: ["acme/api"])
+
+        #expect(tags.count == 101)
+        #expect(tags.allSatisfy { $0.repo == "acme/api" && $0.authorName == nil && $0.accountId == fixedAccountId })
+    }
+
+    @Test func tagURLEncodesName() async throws {
+        let http = MockHTTPClient()
+        http.on("repos/acme/api/tags", body: #"[{"name":"release/1.0"},{"name":"v1+b"}]"#)
+
+        let tags = try await makeProvider(http).tags(in: ["acme/api"])
+
+        #expect(tags.map(\.webURL.absoluteString) == [
+            "https://github.com/acme/api/releases/tag/release%2F1.0",
+            "https://github.com/acme/api/releases/tag/v1%2Bb",
+        ])
+    }
+
+    @Test func missingRepoYieldsNoTags() async throws {
+        let http = MockHTTPClient()
+        http.on("repos/acme/gone/tags", status: 404, body: "{}")
+
+        let tags = try await makeProvider(http).tags(in: ["acme/gone"])
+
+        #expect(tags.isEmpty)
+    }
+
+    @Test func tagRequestFailureOtherThanNotFoundPropagates() async throws {
+        let http = MockHTTPClient()
+        http.on("repos/acme/api/tags", status: 401, body: "{}")
+
+        await #expect(throws: ProviderError.self) {
+            _ = try await makeProvider(http).tags(in: ["acme/api"])
+        }
+    }
 }

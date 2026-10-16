@@ -89,7 +89,35 @@ public actor GitHubProvider: PRProvider {
     }
 
     public func tags(in repos: [String]) async throws -> [Tag] {
-        throw ProviderError.decoding("tags nog niet")
+        var result: [Tag] = []
+        for repo in repos {
+            do {
+                for page in 1...maxPages {
+                    let dtos: [TagDTO] = try await get(
+                        apiBase.appending(path: "repos").appending(path: repo).appending(path: "tags"),
+                        query: [
+                            URLQueryItem(name: "per_page", value: String(pageSize)),
+                            URLQueryItem(name: "page", value: String(page)),
+                        ]
+                    )
+                    for dto in dtos {
+                        guard let url = tagURL(repo: repo, tag: dto.name) else { continue }
+                        result.append(Tag(accountId: accountId, repo: repo, name: dto.name, authorName: nil, webURL: url))
+                    }
+                    if dtos.count < pageSize { break }
+                }
+            } catch ProviderError.server(status: 404) {
+                continue // repo bestaat niet (meer): geen tags
+            }
+        }
+        return result
+    }
+
+    /// De tagnaam wordt als één padsegment gecodeerd, dus "/" wordt %2F en "+" wordt %2B.
+    private func tagURL(repo: String, tag: String) -> URL? {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+        guard let encoded = tag.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+        return URL(string: "https://github.com/\(repo)/releases/tag/\(encoded)")
     }
 
     public func invalidateCredentials() async {
@@ -165,4 +193,8 @@ private struct SearchDTO: Decodable {
 
     let totalCount: Int
     let items: [Item]
+}
+
+private struct TagDTO: Decodable {
+    let name: String
 }
