@@ -179,6 +179,10 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+public enum PRState: String, Codable, Sendable, CaseIterable {
+    case open, merged, closed
+}
+
 public struct PullRequest: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let repo: String
@@ -189,6 +193,8 @@ public struct PullRequest: Codable, Hashable, Sendable {
     public let isDraft: Bool
     public let createdAt: Date
     public let webURL: URL
+    public var state: PRState
+    public var closedAt: Date?
 
     public init(
         accountId: UUID,
@@ -199,7 +205,9 @@ public struct PullRequest: Codable, Hashable, Sendable {
         authorName: String,
         isDraft: Bool,
         createdAt: Date,
-        webURL: URL
+        webURL: URL,
+        state: PRState = .open,
+        closedAt: Date? = nil
     ) {
         self.accountId = accountId
         self.repo = repo
@@ -210,6 +218,28 @@ public struct PullRequest: Codable, Hashable, Sendable {
         self.isDraft = isDraft
         self.createdAt = createdAt
         self.webURL = webURL
+        self.state = state
+        self.closedAt = closedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case accountId, repo, number, title, authorId, authorName, isDraft, createdAt, webURL, state, closedAt
+    }
+
+    /// Oude JSON heeft geen `state`/`closedAt`: dan is de PR open.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        accountId = try c.decode(UUID.self, forKey: .accountId)
+        repo = try c.decode(String.self, forKey: .repo)
+        number = try c.decode(Int.self, forKey: .number)
+        title = try c.decode(String.self, forKey: .title)
+        authorId = try c.decode(String.self, forKey: .authorId)
+        authorName = try c.decode(String.self, forKey: .authorName)
+        isDraft = try c.decode(Bool.self, forKey: .isDraft)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        webURL = try c.decode(URL.self, forKey: .webURL)
+        state = try c.decodeIfPresent(PRState.self, forKey: .state) ?? .open
+        closedAt = try c.decodeIfPresent(Date.self, forKey: .closedAt)
     }
 
     public var dedupKey: String { "\(accountId.uuidString):\(repo):\(number)" }

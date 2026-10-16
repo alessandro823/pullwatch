@@ -11,6 +11,25 @@ import Testing
         #expect(account.hideOwn == true)
     }
 
+    @Test func legacyPullRequestJSONDecodesAsOpen() throws {
+        let json = #"{"accountId":"00000000-0000-0000-0000-000000000001","repo":"proj/api","number":7,"title":"Oud","authorId":"a","authorName":"A","isDraft":false,"createdAt":1760000000,"webURL":"https://example.com/pr/7"}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let pr = try decoder.decode(PullRequest.self, from: Data(json.utf8))
+        #expect(pr.state == .open)
+        #expect(pr.closedAt == nil)
+    }
+
+    @Test func pullRequestWithStateRoundTrips() throws {
+        let closed = Date(timeIntervalSince1970: 1_760_005_000)
+        let pr = PullRequest.fixture(state: .merged, closedAt: closed)
+        let data = try JSONEncoder().encode(pr)
+        let decoded = try JSONDecoder().decode(PullRequest.self, from: data)
+        #expect(decoded == pr)
+        #expect(decoded.state == .merged)
+        #expect(decoded.closedAt == closed)
+    }
+
     @Test func legacyDenyConfigMigrates() throws {
         let json = #"{"id":"00000000-0000-0000-0000-000000000009","kind":"gitHub","displayName":"X","organization":"o","authMethod":"pat","filterMode":"deny","repos":["o/legacy"],"includeDrafts":false,"hideOwn":true}"#
         let a = try JSONDecoder().decode(Account.self, from: Data(json.utf8))

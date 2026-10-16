@@ -11,7 +11,9 @@ extension PullRequest {
         title: String = "Fix bug",
         authorId: String = "someone",
         isDraft: Bool = false,
-        createdAt: Date = Date(timeIntervalSince1970: 1_760_000_000)
+        createdAt: Date = Date(timeIntervalSince1970: 1_760_000_000),
+        state: PRState = .open,
+        closedAt: Date? = nil
     ) -> PullRequest {
         PullRequest(
             accountId: accountId,
@@ -22,7 +24,9 @@ extension PullRequest {
             authorName: "Someone",
             isDraft: isDraft,
             createdAt: createdAt,
-            webURL: URL(string: "https://example.com/\(repo)/pr/\(number)")!
+            webURL: URL(string: "https://example.com/\(repo)/pr/\(number)")!,
+            state: state,
+            closedAt: closedAt
         )
     }
 }
