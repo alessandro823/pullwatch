@@ -78,4 +78,21 @@ import Testing
         #expect(state.tagSeeded.isEmpty)
         #expect(state.seen.isEmpty)
     }
+
+    @Test func legacySeenJsonWithoutSyncMarksLoads() throws {
+        let json = Data(#"{"seen":{},"lastSettings":{},"tagSeeded":{}}"#.utf8)
+        let state = try JSONDecoder().decode(SeenState.self, from: json)
+        #expect(state.syncMarks.isEmpty)
+    }
+
+    @Test func syncMarksRoundTrip() throws {
+        var state = SeenState()
+        state.syncMarks["acc"] = SyncMark(
+            at: t0,
+            settings: Account.fixture(repoWatch: ["p/r": .none]).filterSettings,
+            retention: .sixMonths
+        )
+        let data = try JSONEncoder().encode(state)
+        #expect(try JSONDecoder().decode(SeenState.self, from: data) == state)
+    }
 }

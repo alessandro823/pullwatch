@@ -16,6 +16,9 @@ public struct PollResult: Equatable, Sendable {
     public var statuses: [UUID: AccountState] = [:]
     /// Accounts die in deze cyclus net naar `.unauthorized` gingen (één melding per overgang).
     public var authFailures: [UUID] = []
+    /// PR's (alle states) uit de geschiedenis-sync, gefilterd met `PRFilter`. Leeg als er
+    /// geen sync aan de beurt was of die mislukte. Niet bedoeld voor meldingen.
+    public var syncedPullRequests: [PullRequest] = []
 }
 
 public actor PollEngine {
@@ -23,10 +26,16 @@ public actor PollEngine {
 
     /// Tags worden los van het PR-interval opgehaald, hooguit eens per kwartier.
     public static let tagInterval: TimeInterval = 900
+    /// Maximaal aantal PR's per account per geschiedenis-sync.
+    public static let syncLimit = 1000
+    /// Een vervolg-sync kijkt zoveel terug vóór de vorige sync, zodat randgevallen niet wegvallen.
+    public static let syncOverlap: TimeInterval = 3600
 
     private struct Schedule {
         var nextDue: Date = .distantPast
         var nextTagDue: Date = .distantPast
+        /// Geschiedenis-sync loopt op het tag-ritme mee met een PR-poll die toch al draait.
+        var nextSyncDue: Date = .distantPast
         var failures = 0
         var rateLimitedUntil: Date?
     }
@@ -41,6 +50,15 @@ public actor PollEngine {
         let unavailableTagRepos: Set<String>
         /// Fout bij het ophalen van tags die het account niet laat falen (zie `fetchTags`).
         let tagError: ProviderError?
+        /// `nil` als de sync deze cyclus niet aan de beurt was of mislukte.
+        let synced: [PullRequest]?
+        /// Fout bij de geschiedenis-sync; laat het account nooit falen.
+        let syncError: ProviderError?
+    }
+
+    /// Een geschiedenis-sync die deze cyclus moet draaien; `since == nil` haalt alles op.
+    private struct SyncRequest: Sendable {
+        let since: Date?
     }
 
     private static let maxRateLimitWait: TimeInterval = 3600
@@ -77,11 +95,16 @@ public actor PollEngine {
             if let until = schedule.rateLimitedUntil, until > t { continue }
             schedule.nextDue = t
             schedule.nextTagDue = t
+            schedule.nextSyncDue = t
             schedules[id] = schedule
         }
     }
 
-    public func poll(accounts: [Account], interval: TimeInterval) async -> PollResult {
+    public func poll(
+        accounts: [Account],
+        interval: TimeInterval,
+        retention: HistoryRetention
+    ) async -> PollResult {
         let t = now()
         forget(except: Set(accounts.map(\.id)))
 
@@ -89,12 +112,14 @@ public actor PollEngine {
             .filter { !inFlight.contains($0.id) && (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
             .map { account in
                 let tagsDue = (schedules[account.id]?.nextTagDue ?? .distantPast) <= t
+                let syncDue = (schedules[account.id]?.nextSyncDue ?? .distantPast) <= t
                 return (
                     account: account,
                     provider: provider(for: account),
                     userId: userIds[account.id],
                     tagRepos: account.tagRepos,
-                    fetchTags: tagsDue && !account.tagRepos.isEmpty
+                    fetchTags: tagsDue && !account.tagRepos.isEmpty,
+                    sync: syncDue ? syncRequest(for: account, retention: retention, at: t) : nil
                 )
             }
         // Markeer vóór de eerste suspensie, zodat overlappende poll()-aanroepen deze accounts overslaan.
@@ -110,7 +135,8 @@ public actor PollEngine {
                         job.provider,
                         knownUserId: job.userId,
                         tagRepos: job.tagRepos,
-                        fetchTags: job.fetchTags
+                        fetchTags: job.fetchTags,
+                        sync: job.sync
                     ))
                 }
             }
@@ -122,6 +148,7 @@ public actor PollEngine {
                     let fresh = handleSuccess(job.account, fetched, at: t, interval: interval)
                     result.newPullRequests += fresh.pullRequests
                     result.newTags += fresh.tags
+                    result.syncedPullRequests += handleSync(job.account, fetched, retention: retention, at: t)
                     succeeded.append(id)
                 case .failure(let error):
                     if await handleFailure(job.account, job.provider, error, at: t, interval: interval) {
@@ -150,7 +177,8 @@ public actor PollEngine {
         _ provider: any PRProvider,
         knownUserId: String?,
         tagRepos: [String],
-        fetchTags: Bool
+        fetchTags: Bool,
+        sync: SyncRequest?
     ) async -> Result<Fetched, ProviderError> {
         do {
             let userId: String
@@ -165,13 +193,20 @@ public actor PollEngine {
             if fetchTags {
                 (tagFetch, tagError) = try await Self.fetchTags(provider, in: tagRepos)
             }
+            var synced: [PullRequest]?
+            var syncError: ProviderError?
+            if let sync {
+                (synced, syncError) = await Self.fetchSync(provider, since: sync.since)
+            }
             return .success(Fetched(
                 userId: userId,
                 pullRequests: pullRequests,
                 tags: tagFetch?.tags,
                 tagRepos: tagRepos,
                 unavailableTagRepos: Set((tagFetch?.unavailableRepos ?? []).map { $0.lowercased() }),
-                tagError: tagError
+                tagError: tagError,
+                synced: synced,
+                syncError: syncError
             ))
         } catch let error as ProviderError {
             return .failure(error)
@@ -198,6 +233,31 @@ public actor PollEngine {
         }
     }
 
+    /// Fouten (ook `.rateLimited` en `.unauthorized`) worden teruggegeven, nooit gegooid:
+    /// de geschiedenis-sync mag het account niet laten falen.
+    private static func fetchSync(
+        _ provider: any PRProvider,
+        since: Date?
+    ) async -> (pullRequests: [PullRequest]?, error: ProviderError?) {
+        do {
+            return (try await provider.pullRequests(updatedSince: since, limit: syncLimit), nil)
+        } catch let error as ProviderError {
+            return (nil, error)
+        } catch {
+            return (nil, .network(error.localizedDescription))
+        }
+    }
+
+    /// Vervolg-sync vanaf de vorige sync (min overlap), mits filtersettings en bewaartermijn
+    /// ongewijzigd zijn; anders een eerste sync over de hele bewaartermijn.
+    private func syncRequest(for account: Account, retention: HistoryRetention, at t: Date) -> SyncRequest {
+        if let mark = state.syncMarks[account.id.uuidString],
+           mark.settings == account.filterSettings, mark.retention == retention {
+            return SyncRequest(since: mark.at - Self.syncOverlap)
+        }
+        return SyncRequest(since: retention.maxAge.map { t - $0 })
+    }
+
     private func provider(for account: Account) -> any PRProvider {
         if let cached = providers[account.id], cached.account == account {
             return cached.provider
@@ -215,6 +275,7 @@ public actor PollEngine {
         statuses = statuses.filter { ids.contains($0.key) }
         let keys = Set(ids.map(\.uuidString))
         state.lastSettings = state.lastSettings.filter { keys.contains($0.key) }
+        state.syncMarks = state.syncMarks.filter { keys.contains($0.key) }
         state.retain(onlyKeyPrefixes: keys.map { "\($0):" })
     }
 
@@ -241,7 +302,12 @@ public actor PollEngine {
 
         state.lastSettings[key] = settings
         userIds[account.id] = fetched.userId
-        var schedule = Schedule(nextDue: t + interval, nextTagDue: schedules[account.id]?.nextTagDue ?? .distantPast)
+        let previousSchedule = schedules[account.id] ?? Schedule()
+        var schedule = Schedule(
+            nextDue: t + interval,
+            nextTagDue: previousSchedule.nextTagDue,
+            nextSyncDue: previousSchedule.nextSyncDue
+        )
         if fetched.tags != nil || fetched.tagError != nil {
             schedule.nextTagDue = t + Self.tagInterval
         }
@@ -251,6 +317,35 @@ public actor PollEngine {
         schedules[account.id] = schedule
         statuses[account.id] = .ok(lastPoll: t)
         return (fresh, handleTags(account, fetched, at: t))
+    }
+
+    /// Verwerkt de geschiedenis-sync: plant de volgende sync en geeft de gefilterde PR's terug.
+    /// Markeert niets in `seen`; meldingen blijven bij de open-PR-poll.
+    private func handleSync(
+        _ account: Account,
+        _ fetched: Fetched,
+        retention: HistoryRetention,
+        at t: Date
+    ) -> [PullRequest] {
+        var schedule = schedules[account.id] ?? Schedule()
+        defer { schedules[account.id] = schedule }
+
+        if let error = fetched.syncError {
+            // `syncMarks` ongemoeid: na een mislukte eerste sync volgt weer een eerste sync.
+            if case .rateLimited(let until) = error {
+                schedule.nextSyncDue = min(until, t + Self.maxRateLimitWait)
+            } else {
+                schedule.nextSyncDue = t + Self.tagInterval
+            }
+            logger.warning("geschiedenis-sync mislukt voor \(account.displayName, privacy: .public): \(error.userMessage, privacy: .public)")
+            return []
+        }
+        guard let synced = fetched.synced else { return [] }
+
+        let settings = account.filterSettings
+        state.syncMarks[account.id.uuidString] = SyncMark(at: t, settings: settings, retention: retention)
+        schedule.nextSyncDue = t + Self.tagInterval
+        return synced.filter { PRFilter.passes($0, settings: settings, currentUserId: fetched.userId) }
     }
 
     /// Eerste tag-poll per repo is stil; daarna wordt elke onbekende tag gemeld.

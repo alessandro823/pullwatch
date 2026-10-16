@@ -178,7 +178,8 @@ final class AppModel {
         notificationsAllowed = await notifier.isAuthorized()
         let result = await engine.poll(
             accounts: config.pollableAccounts,
-            interval: TimeInterval(config.clampedInterval)
+            interval: TimeInterval(config.clampedInterval),
+            retention: config.historyRetention
         )
         statuses = result.statuses
 
