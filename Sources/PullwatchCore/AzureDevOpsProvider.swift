@@ -90,7 +90,42 @@ public actor AzureDevOpsProvider: PRProvider {
     }
 
     public func tags(in repos: [String]) async throws -> [Tag] {
-        throw ProviderError.decoding("tags nog niet")
+        var result: [Tag] = []
+        for repo in repos {
+            guard let slash = repo.firstIndex(of: "/") else { continue }
+            let project = String(repo[..<slash])
+            let name = String(repo[repo.index(after: slash)...])
+            let list: ValueList<RefDTO>
+            do {
+                list = try await get(
+                    baseURL.appending(path: project).appending(path: "_apis/git/repositories")
+                        .appending(path: name).appending(path: "refs"),
+                    query: [URLQueryItem(name: "filter", value: "tags/")]
+                )
+            } catch ProviderError.server(status: 404) {
+                continue // repo bestaat niet (meer): geen tags
+            }
+            for ref in list.value {
+                let tagName = ref.name.hasPrefix("refs/tags/") ? String(ref.name.dropFirst("refs/tags/".count)) : ref.name
+                result.append(Tag(
+                    accountId: accountId,
+                    repo: repo,
+                    name: tagName,
+                    authorName: ref.creator?.displayName,
+                    webURL: tagURL(project: project, repo: name, tag: tagName)
+                ))
+            }
+        }
+        return result
+    }
+
+    private func tagURL(project: String, repo: String, tag: String) -> URL {
+        let base = baseURL.appending(path: project).appending(path: "_git").appending(path: repo)
+        var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
+        // "+" en andere tekens expliciet coderen; "/" blijft leesbaar.
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~/"))
+        components.percentEncodedQuery = "version=GT" + (tag.addingPercentEncoding(withAllowedCharacters: allowed) ?? tag)
+        return components.url!
     }
 
     public func invalidateCredentials() async {
@@ -196,4 +231,10 @@ private struct PullRequestDTO: Decodable {
     let creationDate: String
     let createdBy: Identity
     let repository: Repository
+}
+
+private struct RefDTO: Decodable {
+    struct Creator: Decodable { let displayName: String }
+    let name: String
+    let creator: Creator?
 }

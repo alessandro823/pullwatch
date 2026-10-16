@@ -142,4 +142,57 @@ import Testing
         let projectCalls = http.requests.filter { $0.url!.absoluteString.contains("_apis/projects") }
         #expect(projectCalls.count == 1)
     }
+
+    // MARK: - Tags
+
+    @Test func parsesTagsFromRefs() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/git/repositories/api/refs", body: #"""
+        {"value":[{"name":"refs/tags/v1.0","creator":{"displayName":"Jan"}},{"name":"refs/tags/release/2.0"}]}
+        """#)
+
+        let tags = try await makeProvider(http).tags(in: ["proj/api"])
+
+        #expect(tags.map(\.name) == ["v1.0", "release/2.0"])
+        #expect(tags.map(\.authorName) == ["Jan", nil])
+        #expect(tags.allSatisfy { $0.repo == "proj/api" && $0.accountId == fixedAccountId })
+    }
+
+    @Test func tagURLEncodesName() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/git/repositories/api/refs", body: #"{"value":[{"name":"refs/tags/release/2.0+b"}]}"#)
+
+        let tags = try await makeProvider(http).tags(in: ["proj/api"])
+
+        #expect(tags.first?.webURL.absoluteString == "https://dev.azure.com/acme/proj/_git/api?version=GTrelease/2.0%2Bb")
+    }
+
+    @Test func missingRepoYieldsNoTags() async throws {
+        let http = MockHTTPClient()
+        http.on("/refs", status: 404, body: "{}")
+
+        let tags = try await makeProvider(http).tags(in: ["proj/gone"])
+
+        #expect(tags.isEmpty)
+    }
+
+    @Test func tagRequestFailureOtherThanNotFoundPropagates() async throws {
+        let http = MockHTTPClient()
+        http.on("/refs", status: 401, body: "{}")
+
+        await #expect(throws: ProviderError.self) {
+            _ = try await makeProvider(http).tags(in: ["proj/api"])
+        }
+    }
+
+    @Test func requestsTagFilter() async throws {
+        let http = MockHTTPClient()
+        http.on("/refs", body: #"{"value":[]}"#)
+
+        _ = try await makeProvider(http).tags(in: ["proj/api"])
+
+        let url = try #require(http.requests.last?.url?.absoluteString)
+        #expect(url.contains("filter=tags/"))
+        #expect(url.contains("api-version=7.1"))
+    }
 }
