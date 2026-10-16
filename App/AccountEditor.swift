@@ -75,7 +75,13 @@ struct AccountEditor: View {
                         GridRow {
                             Text("Repo").font(.caption).foregroundStyle(.secondary)
                             Text("PR's").font(.caption).foregroundStyle(ItemKind.pullRequest.color)
-                            Text("Tags").font(.caption).foregroundStyle(ItemKind.tag.color)
+                            HStack(spacing: 4) {
+                                Toggle("Alle tags", sources: filteredRepos.map { binding(for: $0, \.tags) }, isOn: \.self)
+                                    .tint(ItemKind.tag.color)
+                                    .help("Tags aan/uit voor alle zichtbare repo's")
+                                    .disabled(filteredRepos.isEmpty)
+                                Text("Tags").font(.caption).foregroundStyle(ItemKind.tag.color)
+                            }
                         }
                         Divider()
                         ForEach(filteredRepos, id: \.self) { repo in
