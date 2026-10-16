@@ -102,6 +102,14 @@ private struct GeneralSettingsView: View {
                     Text("\(seconds / 60) min").tag(seconds)
                 }
             }
+            Picker("Geschiedenis bewaren", selection: Binding(
+                get: { model.config.historyRetention },
+                set: { model.setHistoryRetention($0) }
+            )) {
+                ForEach(HistoryRetention.allCases, id: \.self) { retention in
+                    Text(retention.label).tag(retention)
+                }
+            }
             Toggle("Starten bij inloggen", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, enabled in
                     do {

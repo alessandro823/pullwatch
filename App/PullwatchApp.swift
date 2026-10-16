@@ -32,5 +32,10 @@ struct PullwatchApp: App {
             SettingsView(model: model)
         }
         .windowResizability(.contentMinSize)
+
+        Window("Geschiedenis", id: "history") {
+            HistoryView(model: model)
+        }
+        .windowResizability(.contentMinSize)
     }
 }

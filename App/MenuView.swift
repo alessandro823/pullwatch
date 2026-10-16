@@ -27,10 +27,20 @@ struct MenuView: View {
 
             Divider()
 
-            if model.history.items.isEmpty {
+            SectionHeader(title: "Pull requests")
+            let pullRequests = model.history.latest(.pullRequest, limit: 5)
+            if pullRequests.isEmpty {
                 Text("Nog geen nieuwe PR's").foregroundStyle(.secondary)
             } else {
-                ForEach(model.history.items.prefix(10)) { item in
+                ForEach(pullRequests) { item in
+                    RecentRow(item: item) { model.open(item) }
+                }
+            }
+
+            let tags = model.history.latest(.tag, limit: 5)
+            if model.history.items.contains(where: { $0.entry.kind == .tag }) {
+                SectionHeader(title: "Tags")
+                ForEach(tags) { item in
                     RecentRow(item: item) { model.open(item) }
                 }
             }
@@ -52,6 +62,7 @@ struct MenuView: View {
                 Button("Alles gelezen") { model.markAllRead() }
                     .disabled(model.history.unreadCount == 0)
                 Spacer()
+                HistoryButton()
                 SettingsButton()
                 Button("Stop") { NSApp.terminate(nil) }
             }
@@ -72,6 +83,25 @@ struct SettingsButton: View {
     }
 }
 
+struct HistoryButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Geschiedenis…") {
+            openWindow(id: "history")
+            NSApp.activate()
+        }
+    }
+}
+
+private struct SectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title).font(.caption.bold()).foregroundStyle(.secondary)
+    }
+}
+
 private struct RecentRow: View {
     let item: HistoryItem
     let action: () -> Void
@@ -83,6 +113,9 @@ private struct RecentRow: View {
                     .fill(item.isRead ? Color.clear : Color.accentColor)
                     .frame(width: 6, height: 6)
                     .padding(.top, 6)
+                Image(systemName: item.entry.kind.symbol)
+                    .foregroundStyle(item.entry.kind.color)
+                    .frame(width: 14)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.entry.title).lineLimit(1)
                     HStack(spacing: 4) {
