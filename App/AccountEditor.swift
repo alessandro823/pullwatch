@@ -143,8 +143,7 @@ struct AccountEditor: View {
     }
 
     private var filteredRepos: [String] {
-        let all = Set(availableRepos).union(draft.repoWatch.keys)
-        let sorted = all.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        let sorted = Account.mergedRepoNames(available: availableRepos, configured: Array(draft.repoWatch.keys))
         guard !repoSearch.isEmpty else { return sorted }
         return sorted.filter { $0.localizedCaseInsensitiveContains(repoSearch) }
     }

@@ -162,6 +162,15 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         }
     }
 
+    /// Voegt repo's van de provider en uit de config samen, hoofdletterongevoelig ontdubbeld
+    /// (de schrijfwijze van de provider wint) en hoofdletterongevoelig gesorteerd.
+    public static func mergedRepoNames(available: [String], configured: [String]) -> [String] {
+        var byLowercase: [String: String] = [:]
+        for name in configured { byLowercase[name.lowercased()] = name }
+        for name in available { byLowercase[name.lowercased()] = name }
+        return byLowercase.values.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
     /// Repo's waarvan de tags gevolgd worden, gesorteerd.
     public var tagRepos: [String] {
         repoWatch.filter { $0.value.tags }.keys.sorted()

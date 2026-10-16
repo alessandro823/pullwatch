@@ -75,6 +75,16 @@ import Testing
         #expect(a.repoWatch["o/c"] == .both)
     }
 
+    @Test func mergedRepoNamesCollapsesCaseDuplicatesToProviderCasing() {
+        let merged = Account.mergedRepoNames(available: ["proj/api"], configured: ["Proj/Api"])
+        #expect(merged == ["proj/api"])
+    }
+
+    @Test func mergedRepoNamesKeepsConfigOnlyAndSortsCaseInsensitively() {
+        let merged = Account.mergedRepoNames(available: ["b/x", "A/y"], configured: ["c/gone", "B/X"])
+        #expect(merged == ["A/y", "b/x", "c/gone"])
+    }
+
     @Test func legacyLastSettingsDecode() throws {
         let json = #"{"kind":"gitHub","organization":"o","filterMode":"allow","repos":["o/api"],"includeDrafts":false,"hideOwn":true}"#
         let s = try JSONDecoder().decode(FilterSettings.self, from: Data(json.utf8))
