@@ -267,4 +267,104 @@ private struct Harness {
         _ = await h.engine.poll(accounts: [account], interval: 120) // currentUserId faalt eerst: fetchCount blijft 0
         #expect(await h.provider(account).fetchCount == 1)
     }
+    // MARK: - Tags
+
+    @Test func firstTagPollIsSilentThenNewTagNotifies() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        let v2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
+    }
+
+    @Test func tagsNotRefetchedBeforeTagInterval() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(await h.provider(account).tagFetchCount == 1)
+
+        h.clock.advance(120)
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(await h.provider(account).fetchCount == 2)
+        #expect(await h.provider(account).tagFetchCount == 1)
+
+        await h.engine.forceRefresh()
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(await h.provider(account).tagFetchCount == 2)
+    }
+
+    @Test func reenablingTagsReseedsSilently() async {
+        var account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        account.repoWatch["proj/a"] = .prs
+        h.clock.advance(120)
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        let v2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+
+        account.repoWatch["proj/a"] = .both
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        let v3 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v3")
+        await h.provider(account).set(tags: [v1, v2, v3])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v3])
+    }
+
+    @Test func noTagReposMeansNoTagFetch() async {
+        let account = Account.fixture(newRepoDefault: .prs)
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(await h.provider(account).fetchCount == 1)
+        #expect(await h.provider(account).tagFetchCount == 0)
+    }
+
+    @Test func tagRepoCaseMismatchStillMatches() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = JSONFileStore<SeenState>(url: dir.appending(path: "seen.json"))
+        let account = Account.fixture(repoWatch: ["Proj/A": .both])
+        let h = Harness(accounts: [account], store: store)
+        let v1 = Tag.fixture(accountId: account.id, repo: "Proj/A", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        let v2 = Tag.fixture(accountId: account.id, repo: "Proj/A", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
+        #expect(try store.load()?.tagSeeded == ["\(account.id.uuidString):proj/a"])
+    }
+
+    @Test func tagFetchErrorFailsAccount() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        await h.provider(account).set(error: .server(status: 500))
+        let result = await h.engine.poll(accounts: [account], interval: 120)
+        #expect(result.statuses[account.id] == .failed(.server(status: 500), since: h.clock.now))
+    }
+
+    @Test func newTagsAreSortedByRepoThenName() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both, "proj/b": .tags])
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        let b1 = Tag.fixture(accountId: account.id, repo: "proj/b", name: "v1")
+        let a2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        let a1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [b1, a2, a1])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [a1, a2, b1])
+    }
 }

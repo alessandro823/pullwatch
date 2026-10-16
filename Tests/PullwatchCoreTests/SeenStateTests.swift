@@ -53,4 +53,11 @@ import Testing
         state.retain(onlyKeyPrefixes: ["a:"])
         #expect(state.seen.isEmpty)
     }
+
+    @Test func legacySeenJsonLoads() throws {
+        let json = Data(#"{"seen":{},"lastSettings":{}}"#.utf8)
+        let state = try JSONDecoder().decode(SeenState.self, from: json)
+        #expect(state.tagSeeded.isEmpty)
+        #expect(state.seen.isEmpty)
+    }
 }

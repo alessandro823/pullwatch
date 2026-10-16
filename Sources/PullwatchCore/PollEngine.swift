@@ -11,6 +11,8 @@ public enum AccountState: Equatable, Sendable {
 
 public struct PollResult: Equatable, Sendable {
     public var newPullRequests: [PullRequest] = []
+    /// Nieuwe tags, gesorteerd op repo en dan naam.
+    public var newTags: [Tag] = []
     public var statuses: [UUID: AccountState] = [:]
     /// Accounts die in deze cyclus net naar `.unauthorized` gingen (één melding per overgang).
     public var authFailures: [UUID] = []
@@ -19,8 +21,12 @@ public struct PollResult: Equatable, Sendable {
 public actor PollEngine {
     public typealias ProviderFactory = @Sendable (Account) -> any PRProvider
 
+    /// Tags worden los van het PR-interval opgehaald, hooguit eens per kwartier.
+    public static let tagInterval: TimeInterval = 900
+
     private struct Schedule {
         var nextDue: Date = .distantPast
+        var nextTagDue: Date = .distantPast
         var failures = 0
         var rateLimitedUntil: Date?
     }
@@ -28,6 +34,9 @@ public actor PollEngine {
     private struct Fetched {
         let userId: String
         let pullRequests: [PullRequest]
+        /// `nil` als tags deze cyclus niet aan de beurt waren.
+        let tags: [Tag]?
+        let tagRepos: [String]
     }
 
     private static let maxRateLimitWait: TimeInterval = 3600
@@ -63,6 +72,7 @@ public actor PollEngine {
         for (id, var schedule) in schedules {
             if let until = schedule.rateLimitedUntil, until > t { continue }
             schedule.nextDue = t
+            schedule.nextTagDue = t
             schedules[id] = schedule
         }
     }
@@ -73,7 +83,16 @@ public actor PollEngine {
 
         let jobs = accounts
             .filter { !inFlight.contains($0.id) && (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
-            .map { (account: $0, provider: provider(for: $0), userId: userIds[$0.id]) }
+            .map { account in
+                let tagsDue = (schedules[account.id]?.nextTagDue ?? .distantPast) <= t
+                return (
+                    account: account,
+                    provider: provider(for: account),
+                    userId: userIds[account.id],
+                    tagRepos: account.tagRepos,
+                    fetchTags: tagsDue && !account.tagRepos.isEmpty
+                )
+            }
         // Markeer vóór de eerste suspensie, zodat overlappende poll()-aanroepen deze accounts overslaan.
         for job in jobs { inFlight.insert(job.account.id) }
         let jobsById = Dictionary(uniqueKeysWithValues: jobs.map { ($0.account.id, $0) })
@@ -83,7 +102,12 @@ public actor PollEngine {
         await withTaskGroup(of: (UUID, Result<Fetched, ProviderError>).self) { group in
             for job in jobs {
                 group.addTask {
-                    (job.account.id, await Self.fetch(job.provider, knownUserId: job.userId))
+                    (job.account.id, await Self.fetch(
+                        job.provider,
+                        knownUserId: job.userId,
+                        tagRepos: job.tagRepos,
+                        fetchTags: job.fetchTags
+                    ))
                 }
             }
             // Pas elk resultaat direct toe zodra het binnenkomt (actor-geïsoleerd).
@@ -91,7 +115,9 @@ public actor PollEngine {
                 guard let job = jobsById[id] else { continue }
                 switch outcome {
                 case .success(let fetched):
-                    result.newPullRequests += handleSuccess(job.account, fetched, at: t, interval: interval)
+                    let fresh = handleSuccess(job.account, fetched, at: t, interval: interval)
+                    result.newPullRequests += fresh.pullRequests
+                    result.newTags += fresh.tags
                     succeeded.append(id)
                 case .failure(let error):
                     if await handleFailure(job.account, job.provider, error, at: t, interval: interval) {
@@ -111,11 +137,17 @@ public actor PollEngine {
         }
 
         result.newPullRequests.sort { $0.createdAt < $1.createdAt }
+        result.newTags.sort { ($0.repo, $0.name) < ($1.repo, $1.name) }
         result.statuses = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, statuses[$0.id] ?? .idle) })
         return result
     }
 
-    private static func fetch(_ provider: any PRProvider, knownUserId: String?) async -> Result<Fetched, ProviderError> {
+    private static func fetch(
+        _ provider: any PRProvider,
+        knownUserId: String?,
+        tagRepos: [String],
+        fetchTags: Bool
+    ) async -> Result<Fetched, ProviderError> {
         do {
             let userId: String
             if let knownUserId {
@@ -124,7 +156,8 @@ public actor PollEngine {
                 userId = try await provider.currentUserId()
             }
             let pullRequests = try await provider.openPullRequests()
-            return .success(Fetched(userId: userId, pullRequests: pullRequests))
+            let tags = fetchTags ? try await provider.tags(in: tagRepos) : nil
+            return .success(Fetched(userId: userId, pullRequests: pullRequests, tags: tags, tagRepos: tagRepos))
         } catch let error as ProviderError {
             return .failure(error)
         } catch {
@@ -152,7 +185,12 @@ public actor PollEngine {
         state.retain(onlyKeyPrefixes: keys.map { "\($0):" })
     }
 
-    private func handleSuccess(_ account: Account, _ fetched: Fetched, at t: Date, interval: TimeInterval) -> [PullRequest] {
+    private func handleSuccess(
+        _ account: Account,
+        _ fetched: Fetched,
+        at t: Date,
+        interval: TimeInterval
+    ) -> (pullRequests: [PullRequest], tags: [Tag]) {
         let settings = account.filterSettings
         let key = account.id.uuidString
         let previous = state.lastSettings[key].flatMap { $0.sameSource(as: settings) ? $0 : nil }
@@ -170,8 +208,36 @@ public actor PollEngine {
 
         state.lastSettings[key] = settings
         userIds[account.id] = fetched.userId
-        schedules[account.id] = Schedule(nextDue: t + interval)
+        var schedule = Schedule(nextDue: t + interval, nextTagDue: schedules[account.id]?.nextTagDue ?? .distantPast)
+        if fetched.tags != nil {
+            schedule.nextTagDue = t + Self.tagInterval
+        }
+        schedules[account.id] = schedule
         statuses[account.id] = .ok(lastPoll: t)
+        return (fresh, handleTags(account, fetched, at: t))
+    }
+
+    /// Eerste tag-poll per repo is stil; daarna wordt elke onbekende tag gemeld.
+    private func handleTags(_ account: Account, _ fetched: Fetched, at t: Date) -> [Tag] {
+        let prefix = "\(account.id.uuidString):"
+        // Repo's waarvan tags uit staan vergeten, zodat weer aanzetten opnieuw stil seedt.
+        let wantedKeys = Set(fetched.tagRepos.map { prefix + $0.lowercased() })
+        state.tagSeeded = state.tagSeeded.filter { !$0.hasPrefix(prefix) || wantedKeys.contains($0) }
+
+        guard let tags = fetched.tags else { return [] }
+        let tagsByRepo = Dictionary(grouping: tags) { $0.repo.lowercased() }
+        var fresh: [Tag] = []
+        for repo in Set(fetched.tagRepos.map { $0.lowercased() }) {
+            let seededKey = prefix + repo
+            let isSeeded = state.tagSeeded.contains(seededKey)
+            for tag in tagsByRepo[repo] ?? [] {
+                if isSeeded, !state.contains(tag.dedupKey) {
+                    fresh.append(tag)
+                }
+                state.mark(tag.dedupKey, at: t)
+            }
+            state.tagSeeded.insert(seededKey)
+        }
         return fresh
     }
 

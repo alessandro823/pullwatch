@@ -2,12 +2,22 @@ import Foundation
 
 /// Persistente dedup-state. `seen` bevat dedupKeys van PR's die gemeld of stil geseed zijn,
 /// met de laatste keer dat ze open gezien zijn. `lastSettings` bevat per account de
-/// filtersettings van de laatste succesvolle poll.
+/// filtersettings van de laatste succesvolle poll. `tagSeeded` bevat per tag-repo
+/// (`"{accountId}:{repo.lowercased()}"`) of de eerste, stille tag-poll al gedaan is.
 public struct SeenState: Codable, Equatable, Sendable {
     public var seen: [String: Date] = [:]
     public var lastSettings: [String: FilterSettings] = [:]
+    public var tagSeeded: Set<String> = []
 
     public init() {}
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        seen = try container.decode([String: Date].self, forKey: .seen)
+        lastSettings = try container.decode([String: FilterSettings].self, forKey: .lastSettings)
+        // Ontbreekt in seen.json van vóór tags.
+        tagSeeded = try container.decodeIfPresent(Set<String>.self, forKey: .tagSeeded) ?? []
+    }
 
     public func contains(_ key: String) -> Bool {
         seen[key] != nil
@@ -29,8 +39,9 @@ public struct SeenState: Codable, Equatable, Sendable {
         }
     }
 
-    /// Verwijdert entries waarvan de key niet met één van `keyPrefixes` begint.
+    /// Verwijdert `seen`- en `tagSeeded`-entries waarvan de key niet met één van `keyPrefixes` begint.
     public mutating func retain(onlyKeyPrefixes keyPrefixes: [String]) {
         seen = seen.filter { key, _ in keyPrefixes.contains(where: { key.hasPrefix($0) }) }
+        tagSeeded = tagSeeded.filter { key in keyPrefixes.contains(where: { key.hasPrefix($0) }) }
     }
 }
