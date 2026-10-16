@@ -5,10 +5,53 @@ import Foundation
 public struct FilterSettings: Codable, Hashable, Sendable {
     public var kind: ProviderKind
     public var organization: String
-    public var filterMode: FilterMode
-    public var repos: [String]
+    public var repoWatch: [String: WatchSet]
+    public var newRepoDefault: NewRepoDefault
     public var includeDrafts: Bool
     public var hideOwn: Bool
+
+    public init(
+        kind: ProviderKind,
+        organization: String,
+        repoWatch: [String: WatchSet],
+        newRepoDefault: NewRepoDefault,
+        includeDrafts: Bool,
+        hideOwn: Bool
+    ) {
+        self.kind = kind
+        self.organization = organization
+        self.repoWatch = repoWatch
+        self.newRepoDefault = newRepoDefault
+        self.includeDrafts = includeDrafts
+        self.hideOwn = hideOwn
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, organization, repoWatch, newRepoDefault, includeDrafts, hideOwn
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(ProviderKind.self, forKey: .kind)
+        organization = try c.decode(String.self, forKey: .organization)
+        (repoWatch, newRepoDefault) = try RepoWatchCoding.decode(from: decoder)
+        includeDrafts = try c.decode(Bool.self, forKey: .includeDrafts)
+        hideOwn = try c.decode(Bool.self, forKey: .hideOwn)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(organization, forKey: .organization)
+        try c.encode(repoWatch, forKey: .repoWatch)
+        try c.encode(newRepoDefault, forKey: .newRepoDefault)
+        try c.encode(includeDrafts, forKey: .includeDrafts)
+        try c.encode(hideOwn, forKey: .hideOwn)
+    }
+
+    public func watch(for repo: String) -> WatchSet {
+        RepoWatchCoding.lookup(repo, in: repoWatch, default: newRepoDefault)
+    }
 
     public func sameSource(as other: FilterSettings) -> Bool {
         kind == other.kind
@@ -21,8 +64,8 @@ extension Account {
         FilterSettings(
             kind: kind,
             organization: organization,
-            filterMode: filterMode,
-            repos: repos,
+            repoWatch: repoWatch,
+            newRepoDefault: newRepoDefault,
             includeDrafts: includeDrafts,
             hideOwn: hideOwn
         )
@@ -31,11 +74,7 @@ extension Account {
 
 public enum PRFilter {
     public static func follows(repo: String, settings: FilterSettings) -> Bool {
-        let listed = settings.repos.contains { $0.caseInsensitiveCompare(repo) == .orderedSame }
-        switch settings.filterMode {
-        case .allow: return listed
-        case .deny: return !listed
-        }
+        settings.watch(for: repo).prs
     }
 
     public static func passes(_ pr: PullRequest, settings: FilterSettings, currentUserId: String?) -> Bool {

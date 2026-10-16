@@ -32,8 +32,8 @@ extension Account {
         id: UUID = UUID(),
         kind: ProviderKind = .azureDevOps,
         organization: String = "acme",
-        filterMode: FilterMode = .deny,
-        repos: [String] = [],
+        repoWatch: [String: WatchSet] = [:],
+        newRepoDefault: NewRepoDefault = .prs,
         includeDrafts: Bool = false,
         hideOwn: Bool = true
     ) -> Account {
@@ -43,8 +43,8 @@ extension Account {
             displayName: "Test",
             organization: organization,
             authMethod: .pat,
-            filterMode: filterMode,
-            repos: repos,
+            repoWatch: repoWatch,
+            newRepoDefault: newRepoDefault,
             includeDrafts: includeDrafts,
             hideOwn: hideOwn
         )

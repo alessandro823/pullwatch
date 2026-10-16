@@ -3,19 +3,19 @@ import Testing
 
 @Suite struct PRFilterTests {
     @Test func denyModeFollowsEverythingExceptListed() {
-        let s = Account.fixture(filterMode: .deny, repos: ["proj/legacy"]).filterSettings
+        let s = Account.fixture(repoWatch: ["proj/legacy": .none]).filterSettings
         #expect(PRFilter.follows(repo: "proj/api", settings: s))
         #expect(!PRFilter.follows(repo: "proj/legacy", settings: s))
     }
 
     @Test func allowModeFollowsOnlyListed() {
-        let s = Account.fixture(filterMode: .allow, repos: ["proj/api"]).filterSettings
+        let s = Account.fixture(repoWatch: ["proj/api": .prs], newRepoDefault: .none).filterSettings
         #expect(PRFilter.follows(repo: "proj/api", settings: s))
         #expect(!PRFilter.follows(repo: "proj/web", settings: s))
     }
 
     @Test func repoMatchingIsCaseInsensitive() {
-        let s = Account.fixture(filterMode: .allow, repos: ["Proj/MyRepo"]).filterSettings
+        let s = Account.fixture(repoWatch: ["Proj/MyRepo": .prs], newRepoDefault: .none).filterSettings
         #expect(PRFilter.follows(repo: "proj/myrepo", settings: s))
     }
 
@@ -33,13 +33,13 @@ import Testing
 
     @Test func unfollowedRepoNeverPasses() {
         let pr = PullRequest.fixture(repo: "proj/legacy")
-        let s = Account.fixture(filterMode: .deny, repos: ["proj/legacy"]).filterSettings
+        let s = Account.fixture(repoWatch: ["proj/legacy": .none]).filterSettings
         #expect(!PRFilter.passes(pr, settings: s, currentUserId: "me"))
     }
 
     @Test func sameSourceComparesKindAndOrganizationCaseInsensitive() {
         let a = Account.fixture(kind: .gitHub, organization: "Acme").filterSettings
-        let b = Account.fixture(kind: .gitHub, organization: "acme", repos: ["x/y"]).filterSettings
+        let b = Account.fixture(kind: .gitHub, organization: "acme", repoWatch: ["x/y": .none]).filterSettings
         let c = Account.fixture(kind: .azureDevOps, organization: "acme").filterSettings
         #expect(a.sameSource(as: b))
         #expect(!a.sameSource(as: c))

@@ -6,7 +6,7 @@ public protocol PRProvider: Sendable {
     /// Verbindingstest: controleert token én toegang tot de organisatie/owner,
     /// en geeft de weergavenaam van de ingelogde gebruiker.
     func testConnection() async throws -> String
-    /// Alle repos die het account kan zien, in hetzelfde formaat als `Account.repos`.
+    /// Alle repos die het account kan zien, in hetzelfde formaat als `Account.repoWatch`.
     func listRepos() async throws -> [String]
     /// Alle open PR's inclusief drafts, ongefilterd.
     func openPullRequests() async throws -> [PullRequest]

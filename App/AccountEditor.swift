@@ -54,9 +54,9 @@ struct AccountEditor: View {
             }
 
             Section("Repositories") {
-                Picker("Modus", selection: $draft.filterMode) {
-                    Text("Alles volgen behalve aangevinkte").tag(FilterMode.deny)
-                    Text("Alleen aangevinkte volgen").tag(FilterMode.allow)
+                Picker("Nieuwe repo's", selection: $draft.newRepoDefault) {
+                    Text("PR's volgen").tag(NewRepoDefault.prs)
+                    Text("Niets volgen").tag(NewRepoDefault.none)
                 }
                 .pickerStyle(.radioGroup)
 
@@ -127,7 +127,7 @@ struct AccountEditor: View {
     }
 
     private var filteredRepos: [String] {
-        let all = Set(availableRepos).union(draft.repos)
+        let all = Set(availableRepos).union(draft.repoWatch.keys)
         let sorted = all.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
         guard !repoSearch.isEmpty else { return sorted }
         return sorted.filter { $0.localizedCaseInsensitiveContains(repoSearch) }
@@ -135,13 +135,13 @@ struct AccountEditor: View {
 
     private func binding(for repo: String) -> Binding<Bool> {
         Binding(
-            get: { draft.repos.contains { $0.caseInsensitiveCompare(repo) == .orderedSame } },
+            get: { draft.watch(for: repo).prs },
             set: { isOn in
-                if isOn {
-                    draft.repos.append(repo)
-                } else {
-                    draft.repos.removeAll { $0.caseInsensitiveCompare(repo) == .orderedSame }
-                }
+                // Tijdelijk: alleen PR-vinkje; de volledige tabel volgt later.
+                let key = draft.repoWatch.keys.first { $0.caseInsensitiveCompare(repo) == .orderedSame } ?? repo
+                var watch = draft.watch(for: repo)
+                watch.prs = isOn
+                draft.repoWatch[key] = watch
             }
         )
     }

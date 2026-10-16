@@ -63,14 +63,14 @@ private struct Harness {
     }
 
     @Test func addingRepoToAllowlistSeedsItsExistingPRsSilently() async {
-        var account = Account.fixture(filterMode: .allow, repos: ["proj/a"])
+        var account = Account.fixture(repoWatch: ["proj/a": .prs], newRepoDefault: .none)
         let h = Harness(accounts: [account])
         let a1 = PullRequest.fixture(accountId: account.id, repo: "proj/a", number: 1)
         let b1 = PullRequest.fixture(accountId: account.id, repo: "proj/b", number: 1)
         await h.provider(account).set(pullRequests: [a1, b1])
         _ = await h.engine.poll(accounts: [account], interval: 120)
 
-        account.repos.append("proj/b")
+        account.repoWatch["proj/b"] = .prs
         h.clock.advance(120)
         #expect(await h.engine.poll(accounts: [account], interval: 120).newPullRequests.isEmpty)
 

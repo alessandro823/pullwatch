@@ -26,7 +26,7 @@ import Testing
         let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         let store = JSONFileStore<AppConfig>(url: dir.appending(path: "config.json"))
-        let config = AppConfig(accounts: [Account.fixture(repos: ["a/b"])], pollInterval: 300)
+        let config = AppConfig(accounts: [Account.fixture(repoWatch: ["a/b": .none])], pollInterval: 300)
         try store.save(config)
         #expect(try store.load() == config)
     }

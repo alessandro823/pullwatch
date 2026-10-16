@@ -37,7 +37,7 @@ import Testing
 
         var state = SeenState()
         state.mark("a", at: t0)
-        state.lastSettings["acc"] = Account.fixture(repos: ["p/r"]).filterSettings
+        state.lastSettings["acc"] = Account.fixture(repoWatch: ["p/r": .none]).filterSettings
         try store.save(state)
 
         #expect(try store.load() == state)
