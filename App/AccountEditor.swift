@@ -54,11 +54,10 @@ struct AccountEditor: View {
             }
 
             Section("Repositories") {
-                Picker("Nieuwe repo's", selection: $draft.newRepoDefault) {
-                    Text("PR's volgen").tag(NewRepoDefault.prs)
-                    Text("Niets volgen").tag(NewRepoDefault.none)
+                Picker("Nieuwe repo's volgen", selection: $draft.newRepoDefault) {
+                    Text("Niets").tag(NewRepoDefault.none)
+                    Text("PR's").tag(NewRepoDefault.prs)
                 }
-                .pickerStyle(.radioGroup)
 
                 HStack {
                     TextField("Zoeken", text: $repoSearch)
@@ -72,11 +71,28 @@ struct AccountEditor: View {
                     Text(repoError).font(.caption).foregroundStyle(.red)
                 }
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                        GridRow {
+                            Text("Repo").font(.caption).foregroundStyle(.secondary)
+                            Text("PR's").font(.caption).foregroundStyle(ItemKind.pullRequest.color)
+                            Text("Tags").font(.caption).foregroundStyle(ItemKind.tag.color)
+                        }
+                        Divider()
                         ForEach(filteredRepos, id: \.self) { repo in
-                            Toggle(repo, isOn: binding(for: repo))
+                            GridRow {
+                                Text(repo)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Toggle("PR's", isOn: binding(for: repo, \.prs))
+                                    .tint(ItemKind.pullRequest.color)
+                                Toggle("Tags", isOn: binding(for: repo, \.tags))
+                                    .tint(ItemKind.tag.color)
+                            }
                         }
                     }
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(minHeight: 140)
@@ -133,15 +149,13 @@ struct AccountEditor: View {
         return sorted.filter { $0.localizedCaseInsensitiveContains(repoSearch) }
     }
 
-    private func binding(for repo: String) -> Binding<Bool> {
+    private func binding(for repo: String, _ field: WritableKeyPath<WatchSet, Bool>) -> Binding<Bool> {
         Binding(
-            get: { draft.watch(for: repo).prs },
+            get: { draft.watch(for: repo)[keyPath: field] },
             set: { isOn in
-                // Tijdelijk: alleen PR-vinkje; de volledige tabel volgt later.
-                let key = draft.repoWatch.keys.first { $0.caseInsensitiveCompare(repo) == .orderedSame } ?? repo
                 var watch = draft.watch(for: repo)
-                watch.prs = isOn
-                draft.repoWatch[key] = watch
+                watch[keyPath: field] = isOn
+                draft.setWatch(watch, for: repo)
             }
         )
     }

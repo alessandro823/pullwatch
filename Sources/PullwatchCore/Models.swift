@@ -151,6 +151,17 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         RepoWatchCoding.lookup(repo, in: repoWatch, default: newRepoDefault)
     }
 
+    /// Schrijft wat er voor deze repo gevolgd wordt. Hergebruikt een bestaande key
+    /// (hoofdletterongevoelig); een entry gelijk aan de standaard zonder tags verdwijnt.
+    public mutating func setWatch(_ set: WatchSet, for repo: String) {
+        let key = repoWatch.keys.first { $0.caseInsensitiveCompare(repo) == .orderedSame } ?? repo
+        if set == newRepoDefault.watchSet && !set.tags {
+            repoWatch[key] = nil
+        } else {
+            repoWatch[key] = set
+        }
+    }
+
     /// Repo's waarvan de tags gevolgd worden, gesorteerd.
     public var tagRepos: [String] {
         repoWatch.filter { $0.value.tags }.keys.sorted()

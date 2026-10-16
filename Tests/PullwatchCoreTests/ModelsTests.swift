@@ -44,6 +44,37 @@ import Testing
         #expect(a.watch(for: "proj/x") == .none)
     }
 
+    @Test func setWatchReusesExistingKeyCaseInsensitively() {
+        var a = Account.fixture(repoWatch: ["Proj/Api": .prs], newRepoDefault: .none)
+        a.setWatch(.both, for: "proj/api")
+        #expect(a.repoWatch == ["Proj/Api": .both])
+    }
+
+    @Test func setWatchAddsNewKey() {
+        var a = Account.fixture(repoWatch: [:], newRepoDefault: .none)
+        a.setWatch(.tags, for: "o/new")
+        #expect(a.repoWatch == ["o/new": .tags])
+    }
+
+    @Test func setWatchDropsEntryEqualToDefaultWithoutTags() {
+        var a = Account.fixture(repoWatch: ["o/a": .both], newRepoDefault: .prs)
+        a.setWatch(.prs, for: "O/A")
+        #expect(a.repoWatch.isEmpty)
+        var b = Account.fixture(repoWatch: ["o/a": .prs], newRepoDefault: .none)
+        b.setWatch(.none, for: "o/a")
+        #expect(b.repoWatch.isEmpty)
+    }
+
+    @Test func setWatchKeepsExplicitOptOutAndTagEntries() {
+        var a = Account.fixture(repoWatch: [:], newRepoDefault: .prs)
+        a.setWatch(.none, for: "o/a")
+        #expect(a.repoWatch == ["o/a": .none])
+        a.setWatch(.tags, for: "o/b")
+        a.setWatch(.both, for: "o/c")
+        #expect(a.repoWatch["o/b"] == .tags)
+        #expect(a.repoWatch["o/c"] == .both)
+    }
+
     @Test func legacyLastSettingsDecode() throws {
         let json = #"{"kind":"gitHub","organization":"o","filterMode":"allow","repos":["o/api"],"includeDrafts":false,"hideOwn":true}"#
         let s = try JSONDecoder().decode(FilterSettings.self, from: Data(json.utf8))
