@@ -191,7 +191,9 @@ final class AppModel {
             changed = true
         }
         // Na add: een gemelde PR staat dan al ongelezen in de geschiedenis en blijft dat.
-        if history.merge(synced: result.syncedPullRequests) { changed = true }
+        // PR's van vóór de bewaartermijn niet toevoegen: die zou prune meteen weer verwijderen.
+        let cutoff = config.historyRetention.maxAge.map { now - $0 }
+        if history.merge(synced: result.syncedPullRequests, notBefore: cutoff) { changed = true }
         if history.prune(now: now, retention: config.historyRetention) { changed = true }
         if changed { saveHistory() }
         if hasNotified {

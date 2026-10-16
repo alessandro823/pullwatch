@@ -164,6 +164,67 @@ import Testing
         #expect(history.items.first == before.items.first)
         #expect(history.items.first?.entry.prState == nil)
     }
+
+    @Test func mergeManySyncedPullRequests() {
+        let accounts = (0..<3).map { _ in UUID() }
+        var history = History()
+        // Bestaande, gemelde PR's: elk tiende nummer van elk account.
+        let existing = accounts.flatMap { account in
+            stride(from: 0, to: 1000, by: 10).map { PullRequest.fixture(accountId: account, number: $0, createdAt: t0 + Double($0)) }
+        }
+        history.add(pullRequests: existing, tags: [], at: t0 + 10_000)
+        let synced = accounts.flatMap { account in
+            (0..<1000).map { PullRequest.fixture(accountId: account, number: $0, createdAt: t0 + Double($0), state: .merged) }
+        }
+
+        let changed = history.merge(synced: synced.shuffled())
+        #expect(changed)
+
+        #expect(history.items.count == 3000)
+        #expect(Set(history.items.map(\.id)).count == 3000)
+        #expect(history.items.allSatisfy { $0.entry.prState == .merged })
+        // Gemelde items houden detectedAt en ongelezen-status en staan bovenaan.
+        let notified = history.items.prefix(existing.count)
+        #expect(notified.allSatisfy { !$0.isRead && $0.detectedAt == t0 + 10_000 })
+        #expect(Set(notified.map(\.id)) == Set(existing.map(\.dedupKey)))
+        let backfilled = history.items.dropFirst(existing.count)
+        #expect(backfilled.allSatisfy { $0.isRead })
+        #expect(zip(backfilled, backfilled.dropFirst()).allSatisfy { $0.detectedAt >= $1.detectedAt })
+        let changedAgain = history.merge(synced: synced)
+        #expect(!changedAgain)
+    }
+
+    @Test func mergeKeepsInsertionOrderForEqualDates() {
+        var history = History()
+        history.add(pullRequests: [.fixture(number: 1)], tags: [], at: t0)
+        history.merge(synced: [.fixture(number: 2, createdAt: t0), .fixture(number: 3, createdAt: t0)])
+        #expect(history.items.map(\.entry.dedupKey) == [1, 2, 3].map { PullRequest.fixture(number: $0).dedupKey })
+    }
+
+    @Test func mergeDuplicateInOneBatchKeepsLastState() {
+        var history = History()
+        history.merge(synced: [.fixture(number: 1), .fixture(number: 1, state: .merged, closedAt: t0 + 5)])
+        #expect(history.items.count == 1)
+        #expect(history.items.first?.entry.prState == .merged)
+    }
+
+    @Test func mergeSkipsNewPullRequestsBeforeCutoff() {
+        var history = History()
+        let changed = history.merge(synced: [.fixture(number: 1, createdAt: t0 - 100, state: .open)], notBefore: t0)
+        #expect(!changed)
+        #expect(history.items.isEmpty)
+
+        history.merge(synced: [.fixture(number: 2, createdAt: t0)], notBefore: t0)
+        #expect(history.items.map(\.entry.dedupKey) == [PullRequest.fixture(number: 2).dedupKey])
+    }
+
+    @Test func mergeStillUpdatesExistingItemsBeforeCutoff() {
+        var history = History()
+        history.merge(synced: [.fixture(number: 1, createdAt: t0 - 100)])
+        let changed = history.merge(synced: [.fixture(number: 1, createdAt: t0 - 100, state: .closed, closedAt: t0)], notBefore: t0)
+        #expect(changed)
+        #expect(history.items.first?.entry.prState == .closed)
+    }
 }
 
 @Suite("History opstarten")

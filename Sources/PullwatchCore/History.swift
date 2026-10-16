@@ -130,26 +130,49 @@ public struct History: Codable, Equatable, Sendable {
 
     /// Voegt gesyncte PR's toe (gelezen, `detectedAt` = `createdAt`, op volgorde van `detectedAt`
     /// ingevoegd) of werkt bij bestaande items alleen status, sluitdatum en titel bij.
-    /// Geeft `true` als er iets veranderd is.
+    /// Nieuwe PR's aangemaakt vóór `notBefore` (de bewaartermijn) worden niet toegevoegd, anders
+    /// zouden ze direct weer weggeprunet worden. Geeft `true` als er iets veranderd is.
     @discardableResult
-    public mutating func merge(synced: [PullRequest]) -> Bool {
+    public mutating func merge(synced: [PullRequest], notBefore: Date? = nil) -> Bool {
+        var indexById: [String: Int] = [:]
+        indexById.reserveCapacity(items.count + synced.count)
+        for (index, item) in items.enumerated() {
+            indexById[item.id] = index
+        }
+        let existingCount = items.count
         var changed = false
         for pr in synced {
-            if let index = items.firstIndex(where: { $0.id == pr.dedupKey }) {
-                guard case .pullRequest(var existing) = items[index].entry else { continue }
-                guard existing.state != pr.state || existing.closedAt != pr.closedAt || existing.title != pr.title else { continue }
-                existing.state = pr.state
-                existing.closedAt = pr.closedAt
-                existing.title = pr.title
-                items[index].entry = .pullRequest(existing)
+            let key = pr.dedupKey
+            if let index = indexById[key] {
+                if Self.update(&items[index], with: pr) { changed = true }
             } else {
-                let item = HistoryItem(entry: .pullRequest(pr), detectedAt: pr.createdAt, isRead: true)
-                let position = items.firstIndex { $0.detectedAt < item.detectedAt } ?? items.endIndex
-                items.insert(item, at: position)
+                if let notBefore, pr.createdAt < notBefore { continue }
+                indexById[key] = items.count
+                items.append(HistoryItem(entry: .pullRequest(pr), detectedAt: pr.createdAt, isRead: true))
+                changed = true
             }
-            changed = true
+        }
+        if items.count > existingCount {
+            // Stabiel sorteren (index als tiebreak): bij gelijke datum blijven bestaande items vóór
+            // nieuwe en nieuwe items in aanvoervolgorde.
+            items = items.enumerated()
+                .sorted { $0.element.detectedAt != $1.element.detectedAt
+                    ? $0.element.detectedAt > $1.element.detectedAt
+                    : $0.offset < $1.offset }
+                .map(\.element)
         }
         return changed
+    }
+
+    /// Werkt status, sluitdatum en titel van een PR-item bij. Geeft `true` als er iets veranderde.
+    private static func update(_ item: inout HistoryItem, with pr: PullRequest) -> Bool {
+        guard case .pullRequest(var existing) = item.entry else { return false }
+        guard existing.state != pr.state || existing.closedAt != pr.closedAt || existing.title != pr.title else { return false }
+        existing.state = pr.state
+        existing.closedAt = pr.closedAt
+        existing.title = pr.title
+        item.entry = .pullRequest(existing)
+        return true
     }
 
     public mutating func markRead(_ id: String) {
