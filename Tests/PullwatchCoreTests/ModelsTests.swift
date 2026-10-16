@@ -38,6 +38,11 @@ import Testing
         #expect(a.tagRepos == ["o/a", "o/b"])
     }
 
+    @Test func tagReposAreDedupedCaseInsensitively() {
+        let a = Account.fixture(repoWatch: ["O/A": .both, "o/a": .tags, "o/b": .tags, "o/c": .prs])
+        #expect(a.tagRepos == ["O/A", "o/b"])
+    }
+
     @Test func watchLookupIsCaseInsensitive() {
         let a = Account.fixture(repoWatch: ["Proj/Api": .both], newRepoDefault: .none)
         #expect(a.watch(for: "proj/api") == .both)

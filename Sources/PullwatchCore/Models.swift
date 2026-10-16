@@ -171,9 +171,11 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         return byLowercase.values.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
-    /// Repo's waarvan de tags gevolgd worden, gesorteerd.
+    /// Repo's waarvan de tags gevolgd worden, gesorteerd en hoofdletterongevoelig ontdubbeld
+    /// (de eerste schrijfwijze in sorteervolgorde wint), zodat een repo niet dubbel opgehaald wordt.
     public var tagRepos: [String] {
-        repoWatch.filter { $0.value.tags }.keys.sorted()
+        var seen: Set<String> = []
+        return repoWatch.filter { $0.value.tags }.keys.sorted().filter { seen.insert($0.lowercased()).inserted }
     }
 }
 
