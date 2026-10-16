@@ -187,7 +187,7 @@ public struct PullRequest: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let repo: String
     public let number: Int
-    public let title: String
+    public var title: String
     public let authorId: String
     public let authorName: String
     public let isDraft: Bool

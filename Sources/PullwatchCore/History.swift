@@ -53,6 +53,14 @@ public enum HistoryEntry: Codable, Hashable, Sendable {
         case .tag(let tag): return tag.webURL
         }
     }
+
+    /// Status van de PR; `nil` voor tags.
+    public var prState: PRState? {
+        switch self {
+        case .pullRequest(let pr): return pr.state
+        case .tag: return nil
+        }
+    }
 }
 
 public struct HistoryItem: Codable, Identifiable, Hashable, Sendable {
@@ -118,6 +126,30 @@ public struct History: Codable, Equatable, Sendable {
             items.removeAll { $0.id == entry.dedupKey }
             items.insert(HistoryItem(entry: entry, detectedAt: date, isRead: false), at: 0)
         }
+    }
+
+    /// Voegt gesyncte PR's toe (gelezen, `detectedAt` = `createdAt`, op volgorde van `detectedAt`
+    /// ingevoegd) of werkt bij bestaande items alleen status, sluitdatum en titel bij.
+    /// Geeft `true` als er iets veranderd is.
+    @discardableResult
+    public mutating func merge(synced: [PullRequest]) -> Bool {
+        var changed = false
+        for pr in synced {
+            if let index = items.firstIndex(where: { $0.id == pr.dedupKey }) {
+                guard case .pullRequest(var existing) = items[index].entry else { continue }
+                guard existing.state != pr.state || existing.closedAt != pr.closedAt || existing.title != pr.title else { continue }
+                existing.state = pr.state
+                existing.closedAt = pr.closedAt
+                existing.title = pr.title
+                items[index].entry = .pullRequest(existing)
+            } else {
+                let item = HistoryItem(entry: .pullRequest(pr), detectedAt: pr.createdAt, isRead: true)
+                let position = items.firstIndex { $0.detectedAt < item.detectedAt } ?? items.endIndex
+                items.insert(item, at: position)
+            }
+            changed = true
+        }
+        return changed
     }
 
     public mutating func markRead(_ id: String) {

@@ -117,6 +117,53 @@ import Testing
         let data = try JSONEncoder().encode(history)
         #expect(try JSONDecoder().decode(History.self, from: data) == history)
     }
+
+    @Test func mergeAddsNewAsReadSortedByCreatedAt() {
+        var history = History()
+        history.add(pullRequests: [.fixture(number: 1)], tags: [], at: t0 + 1000)
+        let changed = history.merge(synced: [.fixture(number: 2, createdAt: t0)])
+        #expect(changed)
+        #expect(history.items.map(\.entry.dedupKey) == [
+            PullRequest.fixture(number: 1).dedupKey, PullRequest.fixture(number: 2).dedupKey,
+        ])
+        #expect(history.items[1].isRead)
+        #expect(history.items[1].detectedAt == t0)
+    }
+
+    @Test func mergeUpdatesStateWithoutTouchingReadOrDetectedAt() {
+        var history = History()
+        history.add(pullRequests: [.fixture(number: 1)], tags: [], at: t0 + 1000)
+        history.add(pullRequests: [.fixture(number: 2)], tags: [], at: t0 + 2000)
+        let closed = t0 + 5000
+        history.merge(synced: [.fixture(number: 1, title: "Nieuwe titel", state: .merged, closedAt: closed)])
+        let item = history.items[1]
+        #expect(item.entry.dedupKey == PullRequest.fixture(number: 1).dedupKey)
+        #expect(!item.isRead)
+        #expect(item.detectedAt == t0 + 1000)
+        #expect(item.entry.prState == .merged)
+        #expect(item.entry.title == "Nieuwe titel")
+        guard case .pullRequest(let pr) = item.entry else { Issue.record("geen PR"); return }
+        #expect(pr.closedAt == closed)
+    }
+
+    @Test func mergeUnchangedReturnsFalse() {
+        var history = History()
+        let synced = [PullRequest.fixture(number: 1, state: .closed, closedAt: t0 + 10)]
+        let first = history.merge(synced: synced)
+        let second = history.merge(synced: synced)
+        #expect(first)
+        #expect(!second)
+    }
+
+    @Test func mergeIgnoresTags() {
+        var history = History()
+        history.add(pullRequests: [], tags: [.fixture(repo: "proj/api", name: "v1")], at: t0)
+        let before = history
+        history.merge(synced: [.fixture(repo: "proj/api", number: 1, createdAt: t0 - 100)])
+        #expect(history.items.count == 2)
+        #expect(history.items.first == before.items.first)
+        #expect(history.items.first?.entry.prState == nil)
+    }
 }
 
 @Suite("History opstarten")
