@@ -232,3 +232,15 @@ public struct Tag: Codable, Hashable, Sendable {
 
     public var dedupKey: String { "\(accountId.uuidString):\(repo.lowercased()):tag:\(name)" }
 }
+
+/// Resultaat van `PRProvider.tags(in:)`.
+public struct TagFetch: Equatable, Sendable {
+    public var tags: [Tag]
+    /// Repo's die overgeslagen zijn (404 of geen toegang); exact de doorgegeven repo-strings.
+    public var unavailableRepos: [String]
+
+    public init(tags: [Tag], unavailableRepos: [String] = []) {
+        self.tags = tags
+        self.unavailableRepos = unavailableRepos
+    }
+}

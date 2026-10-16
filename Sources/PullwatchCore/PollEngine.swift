@@ -37,6 +37,8 @@ public actor PollEngine {
         /// `nil` als tags deze cyclus niet aan de beurt waren of het ophalen mislukte.
         let tags: [Tag]?
         let tagRepos: [String]
+        /// Tag-repo's die de provider oversloeg (404/geen toegang), lowercased.
+        let unavailableTagRepos: Set<String>
         /// Fout bij het ophalen van tags die het account niet laat falen (zie `fetchTags`).
         let tagError: ProviderError?
     }
@@ -158,16 +160,17 @@ public actor PollEngine {
                 userId = try await provider.currentUserId()
             }
             let pullRequests = try await provider.openPullRequests()
-            var tags: [Tag]?
+            var tagFetch: TagFetch?
             var tagError: ProviderError?
             if fetchTags {
-                (tags, tagError) = try await Self.fetchTags(provider, in: tagRepos)
+                (tagFetch, tagError) = try await Self.fetchTags(provider, in: tagRepos)
             }
             return .success(Fetched(
                 userId: userId,
                 pullRequests: pullRequests,
-                tags: tags,
+                tags: tagFetch?.tags,
                 tagRepos: tagRepos,
+                unavailableTagRepos: Set((tagFetch?.unavailableRepos ?? []).map { $0.lowercased() }),
                 tagError: tagError
             ))
         } catch let error as ProviderError {
@@ -182,7 +185,7 @@ public actor PollEngine {
     private static func fetchTags(
         _ provider: any PRProvider,
         in repos: [String]
-    ) async throws -> (tags: [Tag]?, error: ProviderError?) {
+    ) async throws -> (fetch: TagFetch?, error: ProviderError?) {
         do {
             return (try await provider.tags(in: repos), nil)
         } catch let error as ProviderError {
@@ -261,8 +264,13 @@ public actor PollEngine {
 
         guard let tags = fetched.tags else { return [] }
         let tagsByRepo = Dictionary(grouping: tags) { $0.repo.lowercased() }
+        if !fetched.unavailableTagRepos.isEmpty {
+            logger.warning("tags overgeslagen voor \(account.displayName, privacy: .public): \(fetched.unavailableTagRepos.sorted().joined(separator: ", "), privacy: .public) (niet gevonden of geen toegang)")
+        }
         var fresh: [Tag] = []
-        for repo in Set(fetched.tagRepos.map { $0.lowercased() }) {
+        // Onbereikbare repo's niet als geseed markeren of verversen: anders worden hun bestaande
+        // tags als nieuw gemeld zodra de toegang terugkomt.
+        for repo in Set(fetched.tagRepos.map { $0.lowercased() }).subtracting(fetched.unavailableTagRepos) {
             let seededKey = prefix + repo
             let isSeeded = state.tagSeeded[seededKey] != nil
             for tag in tagsByRepo[repo] ?? [] {

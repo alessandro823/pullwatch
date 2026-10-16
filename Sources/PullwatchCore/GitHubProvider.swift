@@ -88,8 +88,9 @@ public actor GitHubProvider: PRProvider {
         return result
     }
 
-    public func tags(in repos: [String]) async throws -> [Tag] {
+    public func tags(in repos: [String]) async throws -> TagFetch {
         var result: [Tag] = []
+        var unavailable: [String] = []
         for repo in repos {
             do {
                 for page in 1...maxPages {
@@ -107,12 +108,14 @@ public actor GitHubProvider: PRProvider {
                     if dtos.count < pageSize { break }
                 }
             } catch ProviderError.server(status: 404) {
-                continue // repo bestaat niet (meer): geen tags
+                unavailable.append(repo) // repo bestaat niet (meer)
+                continue
             } catch ProviderError.unauthorized {
-                continue // geen toegang tot deze repo (403: SSO, rechten, IP-allowlist): overslaan, andere repo's gaan door
+                unavailable.append(repo) // geen toegang (403: SSO, rechten, IP-allowlist); andere repo's gaan door
+                continue
             }
         }
-        return result
+        return TagFetch(tags: result, unavailableRepos: unavailable)
     }
 
     /// De tagnaam wordt als één padsegment gecodeerd, dus "/" wordt %2F en "+" wordt %2B.

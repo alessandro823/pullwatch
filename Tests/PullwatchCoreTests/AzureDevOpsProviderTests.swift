@@ -151,7 +151,7 @@ import Testing
         {"value":[{"name":"refs/tags/v1.0","creator":{"displayName":"Jan"}},{"name":"refs/tags/release/2.0"}]}
         """#)
 
-        let tags = try await makeProvider(http).tags(in: ["proj/api"])
+        let tags = try await makeProvider(http).tags(in: ["proj/api"]).tags
 
         #expect(tags.map(\.name) == ["v1.0", "release/2.0"])
         #expect(tags.map(\.authorName) == ["Jan", nil])
@@ -162,7 +162,7 @@ import Testing
         let http = MockHTTPClient()
         http.on("_apis/git/repositories/api/refs", body: #"{"value":[{"name":"refs/tags/release/2.0+b"}]}"#)
 
-        let tags = try await makeProvider(http).tags(in: ["proj/api"])
+        let tags = try await makeProvider(http).tags(in: ["proj/api"]).tags
 
         #expect(tags.first?.webURL.absoluteString == "https://dev.azure.com/acme/proj/_git/api?version=GTrelease/2.0%2Bb")
     }
@@ -171,9 +171,10 @@ import Testing
         let http = MockHTTPClient()
         http.on("/refs", status: 404, body: "{}")
 
-        let tags = try await makeProvider(http).tags(in: ["proj/gone"])
+        let fetch = try await makeProvider(http).tags(in: ["proj/gone"])
 
-        #expect(tags.isEmpty)
+        #expect(fetch.tags.isEmpty)
+        #expect(fetch.unavailableRepos == ["proj/gone"])
     }
 
     @Test func forbiddenRepoIsSkippedOthersStillYieldTags() async throws {
@@ -181,8 +182,10 @@ import Testing
         http.on("_apis/git/repositories/secret/refs", status: 403, body: "{}")
         http.on("_apis/git/repositories/api/refs", body: #"{"value":[{"name":"refs/tags/v1"}]}"#)
 
-        let tags = try await makeProvider(http).tags(in: ["proj/secret", "proj/api"])
+        let fetch = try await makeProvider(http).tags(in: ["proj/secret", "proj/api"])
+        let tags = fetch.tags
 
+        #expect(fetch.unavailableRepos == ["proj/secret"])
         #expect(tags.map(\.name) == ["v1"])
         #expect(tags.allSatisfy { $0.repo == "proj/api" })
     }

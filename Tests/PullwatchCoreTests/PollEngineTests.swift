@@ -453,6 +453,43 @@ private struct Harness {
         #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
     }
 
+    @Test func repoUnavailableOnFirstTagPollSeedsSilentlyOnceReachable() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        await h.provider(account).set(unavailableTagRepos: ["proj/a"]) // bv. 403 door SSO
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        // Toegang komt terug: bestaande tags stil seeden, daarna nieuwe tags wel melden.
+        await h.provider(account).set(unavailableTagRepos: [])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+
+        let v2 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v2")
+        await h.provider(account).set(tags: [v1, v2])
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags == [v2])
+    }
+
+    @Test func seededRepoUnavailableLongerThanPruneAgeReseedsSilently() async {
+        let account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        let v1 = Tag.fixture(accountId: account.id, repo: "proj/a", name: "v1")
+        await h.provider(account).set(tags: [v1])
+        _ = await h.engine.poll(accounts: [account], interval: 120)
+
+        await h.provider(account).set(unavailableTagRepos: ["proj/a"])
+        for _ in 1...31 {
+            h.clock.advance(day)
+            _ = await h.engine.poll(accounts: [account], interval: 120)
+        }
+
+        await h.provider(account).set(unavailableTagRepos: [])
+        h.clock.advance(day)
+        #expect(await h.engine.poll(accounts: [account], interval: 120).newTags.isEmpty)
+    }
+
     @Test func newTagsAreSortedByRepoThenName() async {
         let account = Account.fixture(repoWatch: ["proj/a": .both, "proj/b": .tags])
         let h = Harness(accounts: [account])

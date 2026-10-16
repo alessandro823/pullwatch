@@ -128,7 +128,7 @@ import Testing
         http.on("page=2", body: #"[{"name":"v101"}]"#)
         http.on("repos/acme/api/tags", body: "[\(page1)]")
 
-        let tags = try await makeProvider(http).tags(in: ["acme/api"])
+        let tags = try await makeProvider(http).tags(in: ["acme/api"]).tags
 
         #expect(tags.count == 101)
         #expect(tags.allSatisfy { $0.repo == "acme/api" && $0.authorName == nil && $0.accountId == fixedAccountId })
@@ -138,7 +138,7 @@ import Testing
         let http = MockHTTPClient()
         http.on("repos/acme/api/tags", body: #"[{"name":"release/1.0"},{"name":"v1+b"}]"#)
 
-        let tags = try await makeProvider(http).tags(in: ["acme/api"])
+        let tags = try await makeProvider(http).tags(in: ["acme/api"]).tags
 
         #expect(tags.map(\.webURL.absoluteString) == [
             "https://github.com/acme/api/releases/tag/release%2F1.0",
@@ -150,9 +150,10 @@ import Testing
         let http = MockHTTPClient()
         http.on("repos/acme/gone/tags", status: 404, body: "{}")
 
-        let tags = try await makeProvider(http).tags(in: ["acme/gone"])
+        let fetch = try await makeProvider(http).tags(in: ["acme/gone"])
 
-        #expect(tags.isEmpty)
+        #expect(fetch.tags.isEmpty)
+        #expect(fetch.unavailableRepos == ["acme/gone"])
     }
 
     @Test func forbiddenRepoIsSkippedOthersStillYieldTags() async throws {
@@ -161,8 +162,10 @@ import Testing
         http.on("repos/acme/secret/tags", status: 403, body: #"{"message":"Resource protected by organization SAML enforcement"}"#)
         http.on("repos/acme/api/tags", body: #"[{"name":"v1"}]"#)
 
-        let tags = try await makeProvider(http).tags(in: ["acme/secret", "acme/api"])
+        let fetch = try await makeProvider(http).tags(in: ["acme/secret", "acme/api"])
+        let tags = fetch.tags
 
+        #expect(fetch.unavailableRepos == ["acme/secret"])
         #expect(tags.map(\.name) == ["v1"])
         #expect(tags.allSatisfy { $0.repo == "acme/api" })
     }
