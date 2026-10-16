@@ -163,9 +163,16 @@ public struct History: Codable, Equatable, Sendable {
 
 extension History {
     /// Kiest de beginstand bij het opstarten: `history.json` wint; anders wordt `recent.json` gemigreerd.
+    /// `storedUnreadable` betekent dat `history.json` bestond maar niet te laden was: dan wordt er
+    /// niet gemigreerd (een oude `recent.json` is geen vervanging) en start de geschiedenis leeg.
     /// `needsSave` is `true` als de uitkomst nog naar `history.json` moet worden weggeschreven.
-    public static func initial(stored: History?, legacy: RecentList?) -> (history: History, needsSave: Bool) {
+    public static func initial(
+        stored: History?,
+        storedUnreadable: Bool = false,
+        legacy: RecentList?
+    ) -> (history: History, needsSave: Bool) {
         if let stored { return (stored, false) }
+        if storedUnreadable { return (History(), false) }
         if let legacy { return (History(migrating: legacy), true) }
         return (History(), false)
     }

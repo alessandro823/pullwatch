@@ -34,19 +34,41 @@ final class AppModel {
             config = AppConfig()
         }
 
-        let stored: History?
+        var stored: History?
+        var storedUnreadable = false
         do {
             stored = try historyStore.load()
         } catch {
-            logger.error("history onleesbaar: \(error.localizedDescription)")
-            stored = nil
+            logger.error("history onleesbaar, start leeg: \(error.localizedDescription)")
+            storedUnreadable = true
+            Self.moveAside(historyStore.url)
+        }
+        var legacy: RecentList?
+        if !storedUnreadable {
+            do {
+                legacy = try legacyRecentStore.load()
+            } catch {
+                logger.error("recent.json onleesbaar, niet gemigreerd: \(error.localizedDescription)")
+            }
         }
         // recent.json blijft staan na migratie.
-        let initial = History.initial(stored: stored, legacy: try? legacyRecentStore.load())
+        let initial = History.initial(stored: stored, storedUnreadable: storedUnreadable, legacy: legacy)
         history = initial.history
         var needsSave = initial.needsSave
         if history.prune(now: Date(), retention: config.historyRetention) { needsSave = true }
         if needsSave { saveHistory() }
+    }
+
+    /// Zet een onleesbaar bestand opzij als `<naam>.corrupt-<unix-tijd>`, zodat het niet overschreven wordt.
+    private static func moveAside(_ url: URL) {
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let target = url.deletingLastPathComponent().appending(path: "\(url.lastPathComponent).corrupt-\(timestamp)")
+        do {
+            try FileManager.default.moveItem(at: url, to: target)
+            logger.notice("onleesbaar bestand bewaard als \(target.lastPathComponent, privacy: .public)")
+        } catch {
+            logger.error("opzij zetten van \(url.lastPathComponent, privacy: .public) mislukt: \(error.localizedDescription)")
+        }
     }
 
     var menuBarSymbol: String {

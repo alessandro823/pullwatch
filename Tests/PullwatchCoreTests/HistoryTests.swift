@@ -138,6 +138,14 @@ struct HistoryInitialTests {
         #expect(result.needsSave)
     }
 
+    @Test func onleesbareGeschiedenisMigreertLegacyNiet() {
+        var legacy = RecentList()
+        legacy.add([.fixture(number: 1)], at: Date())
+        let result = History.initial(stored: nil, storedUnreadable: true, legacy: legacy)
+        #expect(result.history.items.isEmpty)
+        #expect(!result.needsSave)
+    }
+
     @Test func nietsGeeftLeegZonderOpslaan() {
         let result = History.initial(stored: nil, legacy: nil)
         #expect(result.history.items.isEmpty)
