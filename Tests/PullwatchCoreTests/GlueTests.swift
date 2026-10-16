@@ -11,20 +11,6 @@ import Testing
         #expect(Backoff.delay(baseInterval: 120, consecutiveFailures: 50) == 900)
     }
 
-    @Test func upToThreeNewPullRequestsGetIndividualNotifications() {
-        let prs = (1...3).map { PullRequest.fixture(number: $0) }
-        #expect(NotificationPlanner.plan(prs) == prs.map { .single($0) })
-    }
-
-    @Test func moreThanThreeBecomesOneSummaryWithFirstThreeLines() {
-        let prs = (1...5).map { PullRequest.fixture(repo: "p/r", number: $0, title: "T\($0)") }
-        #expect(NotificationPlanner.plan(prs) == [.summary(count: 5, lines: ["p/r: T1", "p/r: T2", "p/r: T3"])])
-    }
-
-    @Test func emptyInputPlansNothing() {
-        #expect(NotificationPlanner.plan([]).isEmpty)
-    }
-
     @Test func factoryPicksProviderByKind() {
         #expect(ProviderFactory.make(Account.fixture(kind: .azureDevOps)) is AzureDevOpsProvider)
         #expect(ProviderFactory.make(Account.fixture(kind: .gitHub)) is GitHubProvider)

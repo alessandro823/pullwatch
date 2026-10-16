@@ -143,7 +143,7 @@ final class AppModel {
         if !result.newPullRequests.isEmpty {
             recent.add(result.newPullRequests, at: Date())
             saveRecent()
-            notifier.deliver(NotificationPlanner.plan(result.newPullRequests))
+            notifier.deliver(NotificationPlanner.plan(pullRequests: result.newPullRequests, tags: []))
         }
         for id in result.authFailures {
             if let account = config.accounts.first(where: { $0.id == id }) {

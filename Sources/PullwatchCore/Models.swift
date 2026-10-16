@@ -4,6 +4,10 @@ public enum ProviderKind: String, Codable, Hashable, Sendable, CaseIterable {
     case azureDevOps, gitHub
 }
 
+public enum ItemKind: String, Codable, Sendable {
+    case pullRequest, tag
+}
+
 public enum AuthMethod: String, Codable, Hashable, Sendable, CaseIterable {
     case pat, cli
 }
