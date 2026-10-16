@@ -91,10 +91,12 @@ public actor AzureDevOpsProvider: PRProvider {
 
     public func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] {
         var byId: [Int: PullRequest] = [:]
+        // Met `since` twee reeksen: recent aangemaakt en recent gesloten; zonder `since` één reeks.
+        let ranges: [String?] = since == nil ? [nil] : ["created", "closed"]
+        // Per reeks het aantal opgehaalde PR's over alle projecten; een reeks stopt bij `limit`.
+        var fetched = Array(repeating: 0, count: ranges.count)
         for project in try await projects() {
-            // Met `since` twee reeksen: recent aangemaakt en recent gesloten; zonder `since` één reeks.
-            let ranges: [String?] = since == nil ? [nil] : ["created", "closed"]
-            for range in ranges {
+            for (series, range) in ranges.enumerated() where fetched[series] < limit {
                 var skip = 0
                 while true {
                     var query = [
@@ -120,13 +122,12 @@ public actor AzureDevOpsProvider: PRProvider {
                     for dto in page.value {
                         byId[dto.pullRequestId] = try makePullRequest(dto)
                     }
-                    if page.value.count < pageSize { break }
+                    fetched[series] += page.value.count
+                    if page.value.count < pageSize || fetched[series] >= limit { break }
                     skip += pageSize
-                    // Zonder `since` is er één reeks en kan hier worden gestopt.
-                    if since == nil && byId.count >= limit { break }
                 }
             }
-            if since == nil && byId.count >= limit { break }
+            if fetched.allSatisfy({ $0 >= limit }) { break }
         }
         return Array(byId.values.sorted { $0.createdAt > $1.createdAt }.prefix(limit))
     }

@@ -267,4 +267,19 @@ import Testing
         #expect(prRequests.count == 1)
         #expect(!prRequests[0].contains("queryTimeRangeType"))
     }
+
+    @Test func syncWithSinceStopsEachSeriesAtLimit() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/projects", body: #"{"count":2,"value":[{"name":"A"},{"name":"B"}]}"#)
+        let fullPage = (1...100).map { syncPR(id: $0, status: "active") }.joined(separator: ",")
+        http.on("_apis/git/pullrequests", body: #"{"value":[\#(fullPage)]}"#)
+
+        _ = try await makeProvider(http).pullRequests(updatedSince: Date(timeIntervalSince1970: 1_760_000_000), limit: 250)
+
+        let prRequests = http.requests.map(\.url!.absoluteString).filter { $0.contains("_apis/git/pullrequests") }
+        // Per reeks drie volle pagina's (300 ≥ 250), daarna stopt die reeks, ook voor project B.
+        #expect(prRequests.filter { $0.contains("queryTimeRangeType=created") }.count == 3)
+        #expect(prRequests.filter { $0.contains("queryTimeRangeType=closed") }.count == 3)
+        #expect(!prRequests.contains { $0.contains("/B/") })
+    }
 }
