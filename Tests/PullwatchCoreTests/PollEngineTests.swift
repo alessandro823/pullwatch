@@ -669,4 +669,75 @@ private struct Harness {
         #expect(await h.provider(account).syncCount == 2)
         #expect(await h.provider(account).lastSyncSince == Date??.some(h.clock.now - 365 * day))
     }
+
+    @Test func onlyOneFirstSyncPerCycle() async {
+        let a = Account.fixture()
+        let b = Account.fixture()
+        let h = Harness(accounts: [a, b])
+        _ = await h.engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        #expect(await h.provider(a).syncCount == 1)
+        #expect(await h.provider(b).syncCount == 0)
+        #expect(await h.provider(b).fetchCount == 1)
+
+        // B's sync bleef aan de beurt en gaat mee met de volgende poll.
+        h.clock.advance(120)
+        _ = await h.engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        #expect(await h.provider(a).syncCount == 1)
+        #expect(await h.provider(b).syncCount == 1)
+        #expect(await h.provider(b).lastSyncSince == Date??.some(h.clock.now - 365 * day))
+    }
+
+    @Test func incrementalSyncsRunTogetherInOneCycle() async {
+        let a = Account.fixture()
+        let b = Account.fixture()
+        let h = Harness(accounts: [a, b])
+        _ = await h.engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        h.clock.advance(120)
+        _ = await h.engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        // Nu hebben beide een mark; A is om t+900 weer aan de beurt, B om t+1020.
+        h.clock.advance(900)
+        _ = await h.engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        #expect(await h.provider(a).syncCount == 2)
+        #expect(await h.provider(b).syncCount == 2)
+    }
+
+    @Test func firstSyncWaitsButIncrementalSyncOfOtherAccountRuns() async {
+        let a = Account.fixture()
+        let b = Account.fixture()
+        let c = Account.fixture()
+        let h = Harness(accounts: [a, b, c])
+        _ = await h.engine.poll(accounts: [a], interval: 120, retention: .oneYear)
+        h.clock.advance(900)
+        // A: vervolg-sync; B: eerste sync; C: eerste sync die moet wachten.
+        _ = await h.engine.poll(accounts: [a, b, c], interval: 120, retention: .oneYear)
+        #expect(await h.provider(a).syncCount == 2)
+        #expect(await h.provider(b).syncCount == 1)
+        #expect(await h.provider(c).syncCount == 0)
+    }
+
+    @Test func togglingOnlyTagsKeepsIncrementalSync() async {
+        var account = Account.fixture(repoWatch: ["proj/b": .both])
+        let h = Harness(accounts: [account])
+        let t = h.clock.now
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+
+        account.setWatch(.both, for: "proj/a")
+        account.setWatch(.prs, for: "PROJ/B")
+        h.clock.advance(900)
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+        #expect(await h.provider(account).syncCount == 2)
+        #expect(await h.provider(account).lastSyncSince == Date??.some(t - 3600))
+    }
+
+    @Test func togglingPullRequestFlagTriggersFullResync() async {
+        var account = Account.fixture(repoWatch: ["proj/a": .both])
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+
+        account.setWatch(.tags, for: "proj/a")
+        h.clock.advance(900)
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+        #expect(await h.provider(account).syncCount == 2)
+        #expect(await h.provider(account).lastSyncSince == Date??.some(h.clock.now - 365 * day))
+    }
 }

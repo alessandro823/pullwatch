@@ -59,6 +59,8 @@ public actor PollEngine {
     /// Een geschiedenis-sync die deze cyclus moet draaien; `since == nil` haalt alles op.
     private struct SyncRequest: Sendable {
         let since: Date?
+        /// Eerste sync over de hele bewaartermijn (geen geldige `SyncMark`).
+        let isFirst: Bool
     }
 
     private static let maxRateLimitWait: TimeInterval = 3600
@@ -108,18 +110,26 @@ public actor PollEngine {
         let t = now()
         forget(except: Set(accounts.map(\.id)))
 
+        // Hooguit één eerste sync (volledige backfill) per cyclus, zodat de backfills van meerdere
+        // accounts niet samen de zoek-ratelimit opmaken. Andere accounts houden hun `nextSyncDue`
+        // en komen in een volgende cyclus aan de beurt; vervolg-syncs lopen gewoon mee.
+        var firstSyncTaken = false
         let jobs = accounts
             .filter { !inFlight.contains($0.id) && (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
             .map { account in
                 let tagsDue = (schedules[account.id]?.nextTagDue ?? .distantPast) <= t
                 let syncDue = (schedules[account.id]?.nextSyncDue ?? .distantPast) <= t
+                var sync = syncDue ? syncRequest(for: account, retention: retention, at: t) : nil
+                if let request = sync, request.isFirst {
+                    if firstSyncTaken { sync = nil } else { firstSyncTaken = true }
+                }
                 return (
                     account: account,
                     provider: provider(for: account),
                     userId: userIds[account.id],
                     tagRepos: account.tagRepos,
                     fetchTags: tagsDue && !account.tagRepos.isEmpty,
-                    sync: syncDue ? syncRequest(for: account, retention: retention, at: t) : nil
+                    sync: sync
                 )
             }
         // Markeer vóór de eerste suspensie, zodat overlappende poll()-aanroepen deze accounts overslaan.
@@ -248,14 +258,14 @@ public actor PollEngine {
         }
     }
 
-    /// Vervolg-sync vanaf de vorige sync (min overlap), mits filtersettings en bewaartermijn
-    /// ongewijzigd zijn; anders een eerste sync over de hele bewaartermijn.
+    /// Vervolg-sync vanaf de vorige sync (min overlap), mits de sync-relevante filtersettings en
+    /// de bewaartermijn ongewijzigd zijn; anders een eerste sync over de hele bewaartermijn.
     private func syncRequest(for account: Account, retention: HistoryRetention, at t: Date) -> SyncRequest {
         if let mark = state.syncMarks[account.id.uuidString],
-           mark.settings == account.filterSettings, mark.retention == retention {
-            return SyncRequest(since: mark.at - Self.syncOverlap)
+           mark.settings.sameSyncScope(as: account.filterSettings), mark.retention == retention {
+            return SyncRequest(since: mark.at - Self.syncOverlap, isFirst: false)
         }
-        return SyncRequest(since: retention.maxAge.map { t - $0 })
+        return SyncRequest(since: retention.maxAge.map { t - $0 }, isFirst: true)
     }
 
     private func provider(for account: Account) -> any PRProvider {

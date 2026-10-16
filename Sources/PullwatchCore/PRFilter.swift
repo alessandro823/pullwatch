@@ -57,6 +57,27 @@ public struct FilterSettings: Codable, Hashable, Sendable {
         kind == other.kind
             && organization.caseInsensitiveCompare(other.organization) == .orderedSame
     }
+
+    /// Of een geschiedenis-sync onder `other` dezelfde PR's oplevert: zelfde bron, zelfde
+    /// PR-vinkjes per repo (hoofdletterongevoelig) en standaard, drafts en eigen PR's.
+    /// Tag-vinkjes tellen niet mee.
+    public func sameSyncScope(as other: FilterSettings) -> Bool {
+        sameSource(as: other)
+            && newRepoDefault == other.newRepoDefault
+            && includeDrafts == other.includeDrafts
+            && hideOwn == other.hideOwn
+            && prOverrides == other.prOverrides
+    }
+
+    /// PR-vinkjes per repo (lowercased) die afwijken van de standaard; een entry gelijk aan de
+    /// standaard gedraagt zich als een ontbrekende entry.
+    private var prOverrides: [String: Bool] {
+        var result: [String: Bool] = [:]
+        for (repo, set) in repoWatch where set.prs != newRepoDefault.watchSet.prs {
+            result[repo.lowercased()] = set.prs
+        }
+        return result
+    }
 }
 
 extension Account {

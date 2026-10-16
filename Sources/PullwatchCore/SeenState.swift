@@ -57,7 +57,8 @@ public struct SeenState: Codable, Equatable, Sendable {
 }
 
 /// Moment en context van de laatste geslaagde geschiedenis-sync van een account. Wijken de
-/// filtersettings of de bewaartermijn af, dan is de volgende sync weer een volledige eerste sync.
+/// sync-relevante filtersettings (`FilterSettings.sameSyncScope`) of de bewaartermijn af, dan is
+/// de volgende sync weer een volledige eerste sync.
 public struct SyncMark: Codable, Equatable, Sendable {
     public var at: Date
     public var settings: FilterSettings
