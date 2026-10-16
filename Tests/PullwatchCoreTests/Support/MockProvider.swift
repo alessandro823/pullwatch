@@ -8,11 +8,19 @@ actor MockProvider: PRProvider {
     private var tagError: ProviderError?
     private var unavailableTagRepos: Set<String> = []
     private var tagList: [Tag] = []
+    private var syncedPullRequests: [PullRequest] = []
+    private var syncError: ProviderError?
     private(set) var fetchCount = 0
+    private(set) var syncCount = 0
+    /// Laatste aan `pullRequests(updatedSince:limit:)` doorgegeven `since` (nil = nog nooit aangeroepen).
+    private(set) var lastSyncSince: Date??
     private(set) var tagFetchCount = 0
     private(set) var invalidateCount = 0
 
     func set(pullRequests: [PullRequest]) { self.pullRequests = pullRequests }
+    func set(syncedPullRequests: [PullRequest]) { self.syncedPullRequests = syncedPullRequests }
+    /// Fout die alleen `pullRequests(updatedSince:limit:)` gooit.
+    func set(syncError: ProviderError?) { self.syncError = syncError }
     func set(tags: [Tag]) { tagList = tags }
     func set(error: ProviderError?) { self.error = error }
     /// Fout die alleen `tags(in:)` gooit.
@@ -36,6 +44,13 @@ actor MockProvider: PRProvider {
         fetchCount += 1
         if let error { throw error }
         return pullRequests
+    }
+
+    func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] {
+        syncCount += 1
+        lastSyncSince = .some(since)
+        if let syncError { throw syncError }
+        return Array(syncedPullRequests.prefix(limit))
     }
 
     func tags(in repos: [String]) async throws -> TagFetch {
@@ -78,6 +93,7 @@ actor GatedProvider: PRProvider {
         return []
     }
 
+    func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] { [] }
     func tags(in repos: [String]) async throws -> TagFetch { TagFetch(tags: []) }
     func invalidateCredentials() async {}
 }

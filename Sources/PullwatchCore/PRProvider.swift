@@ -10,6 +10,9 @@ public protocol PRProvider: Sendable {
     func listRepos() async throws -> [String]
     /// Alle open PR's inclusief drafts, ongefilterd.
     func openPullRequests() async throws -> [PullRequest]
+    /// PR's in alle statussen (open, gemerged, gesloten), nieuwste eerst, afgekapt op `limit`.
+    /// Met `since` alleen PR's die sindsdien zijn bijgewerkt (GitHub) of aangemaakt/gesloten (Azure DevOps).
+    func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest]
     /// Tags van de opgegeven repos; `Tag.repo` is exact de doorgegeven repo-string.
     /// Een repo die 404 of geen toegang geeft wordt overgeslagen en in `unavailableRepos` gemeld.
     func tags(in repos: [String]) async throws -> TagFetch

@@ -88,6 +88,29 @@ public actor GitHubProvider: PRProvider {
         return result
     }
 
+    public func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] {
+        let qualifier = try await resolveOwnerKind() == .organization ? "org" : "user"
+        var q = "is:pr \(qualifier):\(owner)"
+        if let since {
+            q += " updated:>=" + since.formatted(Date.ISO8601FormatStyle(timeZone: .gmt))
+        }
+        var result: [PullRequest] = []
+        for page in 1...maxPages {
+            let response: SearchDTO = try await get(apiBase.appending(path: "search/issues"), query: [
+                URLQueryItem(name: "q", value: q),
+                URLQueryItem(name: "sort", value: "updated"),
+                URLQueryItem(name: "order", value: "desc"),
+                URLQueryItem(name: "per_page", value: String(pageSize)),
+                URLQueryItem(name: "page", value: String(page)),
+            ])
+            for item in response.items {
+                result.append(try makePullRequest(item))
+            }
+            if result.count >= limit || response.items.count < pageSize || result.count >= response.totalCount { break }
+        }
+        return Array(result.prefix(limit))
+    }
+
     public func tags(in repos: [String]) async throws -> TagFetch {
         var result: [Tag] = []
         var unavailable: [String] = []
@@ -146,6 +169,7 @@ public actor GitHubProvider: PRProvider {
             throw ProviderError.decoding("url in PR \(item.number)")
         }
         let repo = repoURL.pathComponents.suffix(2).joined(separator: "/")
+        let state: PRState = (item.state ?? "open") == "open" ? .open : (item.pullRequest?.mergedAt != nil ? .merged : .closed)
         return PullRequest(
             accountId: accountId,
             repo: repo,
@@ -155,7 +179,9 @@ public actor GitHubProvider: PRProvider {
             authorName: item.user.login,
             isDraft: item.draft ?? false,
             createdAt: createdAt,
-            webURL: webURL
+            webURL: webURL,
+            state: state,
+            closedAt: item.closedAt.flatMap(DateParsing.parse)
         )
     }
 
@@ -186,11 +212,18 @@ private struct RepoDTO: Decodable {
 }
 
 private struct SearchDTO: Decodable {
+    struct PullRequestInfo: Decodable {
+        let mergedAt: String?
+    }
+
     struct Item: Decodable {
         let number: Int
         let title: String
         let createdAt: String
         let draft: Bool?
+        let state: String?
+        let closedAt: String?
+        let pullRequest: PullRequestInfo?
         let user: UserDTO
         let htmlUrl: String
         let repositoryUrl: String

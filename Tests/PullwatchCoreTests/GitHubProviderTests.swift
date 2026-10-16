@@ -178,4 +178,66 @@ import Testing
             _ = try await makeProvider(http).tags(in: ["acme/api"])
         }
     }
+
+    func syncItem(number: Int, state: String, mergedAt: String?, closedAt: String? = nil) -> String {
+        let closed = closedAt.map { #""\#($0)""# } ?? "null"
+        let pr = mergedAt.map { #"{"merged_at":"\#($0)"}"# } ?? #"{"merged_at":null}"#
+        return #"""
+        {"number":\#(number),"title":"PR \#(number)","created_at":"2025-10-15T10:00:00Z","state":"\#(state)",
+         "closed_at":\#(closed),"pull_request":\#(pr),
+         "user":{"login":"octocat"},
+         "html_url":"https://github.com/acme/web/pull/\#(number)",
+         "repository_url":"https://api.github.com/repos/acme/web"}
+        """#
+    }
+
+    func searchQuery(_ request: URLRequest, _ name: String) -> String? {
+        URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == name }?.value
+    }
+
+    @Test func syncMapsStates() async throws {
+        let http = MockHTTPClient()
+        http.on("search/issues", body: #"""
+        {"total_count":3,"items":[\#(syncItem(number: 1, state: "open", mergedAt: nil)),
+        \#(syncItem(number: 2, state: "closed", mergedAt: "2025-10-16T09:00:00Z", closedAt: "2025-10-16T09:00:00Z")),
+        \#(syncItem(number: 3, state: "closed", mergedAt: nil, closedAt: "2025-10-16T08:00:00Z"))]}
+        """#)
+        http.on("users/acme", body: #"{"type":"Organization"}"#)
+
+        let prs = try await makeProvider(http).pullRequests(updatedSince: nil, limit: 1000)
+
+        #expect(prs.map(\.state) == [.open, .merged, .closed])
+        #expect(prs[0].closedAt == nil)
+        #expect(prs[1].closedAt == Date(timeIntervalSince1970: 1_760_605_200))
+        #expect(prs[2].closedAt == Date(timeIntervalSince1970: 1_760_601_600))
+    }
+
+    @Test func syncQueryIncludesUpdatedSinceAndSort() async throws {
+        let http = MockHTTPClient()
+        http.on("search/issues", body: #"{"total_count":0,"items":[]}"#)
+        http.on("users/acme", body: #"{"type":"Organization"}"#)
+        let provider = makeProvider(http)
+
+        _ = try await provider.pullRequests(updatedSince: Date(timeIntervalSince1970: 1_760_000_000), limit: 1000)
+        let withSince = try #require(http.requests.last)
+        #expect(searchQuery(withSince, "q") == "is:pr org:acme updated:>=2025-10-09T08:53:20Z")
+        #expect(searchQuery(withSince, "sort") == "updated")
+        #expect(searchQuery(withSince, "order") == "desc")
+
+        _ = try await provider.pullRequests(updatedSince: nil, limit: 1000)
+        let without = try #require(http.requests.last)
+        #expect(searchQuery(without, "q") == "is:pr org:acme")
+    }
+
+    @Test func syncStopsAtLimit() async throws {
+        let http = MockHTTPClient()
+        let page = (1...100).map { syncItem(number: $0, state: "open", mergedAt: nil) }.joined(separator: ",")
+        http.on("search/issues", body: #"{"total_count":300,"items":[\#(page)]}"#)
+        http.on("users/acme", body: #"{"type":"Organization"}"#)
+
+        let prs = try await makeProvider(http).pullRequests(updatedSince: nil, limit: 150)
+
+        #expect(prs.count == 150)
+        #expect(http.requests.filter { $0.url!.absoluteString.contains("search/issues") }.count == 2)
+    }
 }
