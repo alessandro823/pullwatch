@@ -183,11 +183,18 @@ final class AppModel {
         )
         statuses = result.statuses
 
-        if !result.newPullRequests.isEmpty || !result.newTags.isEmpty {
-            let now = Date()
+        let now = Date()
+        var changed = false
+        let hasNotified = !result.newPullRequests.isEmpty || !result.newTags.isEmpty
+        if hasNotified {
             history.add(pullRequests: result.newPullRequests, tags: result.newTags, at: now)
-            history.prune(now: now, retention: config.historyRetention)
-            saveHistory()
+            changed = true
+        }
+        // Na add: een gemelde PR staat dan al ongelezen in de geschiedenis en blijft dat.
+        if history.merge(synced: result.syncedPullRequests) { changed = true }
+        if history.prune(now: now, retention: config.historyRetention) { changed = true }
+        if changed { saveHistory() }
+        if hasNotified {
             notifier.deliver(NotificationPlanner.plan(pullRequests: result.newPullRequests, tags: result.newTags))
         }
         for id in result.authFailures {

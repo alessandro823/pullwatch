@@ -27,6 +27,10 @@ Tags volg je door per repo het vinkje voor tags aan te zetten; ze staan standaar
 
 Via **Geschiedenis…** in het menu open je een doorzoekbaar overzicht van alle gedetecteerde PR's en tags (filter op soort, dubbelklik opent de pagina). De bewaartermijn (2 maanden, 6 maanden, 1 jaar of altijd) stel je in onder Instellingen → Algemeen.
 
+### Geschiedenis ophalen en bijhouden
+
+Pullwatch haalt ook al bestaande PR's (open, gemerged en gesloten) op voor de geschiedenis. De eerste keer gaat dat terug tot de ingestelde bewaartermijn, met maximaal 1000 PR's per account; daarna wordt de geschiedenis elke 15 minuten bijgewerkt (status, titel en sluitdatum). Opgehaalde PR's geven geen melding en staan als gelezen in de lijst; de kolom **Status** toont Open, Gemerged of Gesloten. Een wijziging van het repo-filter of de bewaartermijn start voor dat account opnieuw met een eerste keer ophalen. De GitHub-zoek-API heeft een eigen limiet van 30 verzoeken per minuut; bij een limiet wacht Pullwatch tot die is verlopen en loopt de PR-polling gewoon door.
+
 Bestaande PR's worden bij het toevoegen stil overgeslagen; alleen nieuwe PR's geven een melding.
 
 Aanroepen van `az` en `gh` time-outen na 20 seconden.

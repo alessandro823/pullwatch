@@ -45,6 +45,12 @@ struct HistoryView: View {
                     KindPill(kind: item.entry.kind)
                 }
                 .width(50)
+                TableColumn("Status") { item in
+                    if let state = item.entry.prState {
+                        StatePill(state: state)
+                    }
+                }
+                .width(80)
                 TableColumn("Titel") { item in
                     Text(item.entry.title)
                         .fontWeight(item.isRead ? .regular : .bold)
