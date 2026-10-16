@@ -74,6 +74,8 @@ public actor PollEngine {
     private var schedules: [UUID: Schedule] = [:]
     private var statuses: [UUID: AccountState] = [:]
     private var inFlight: Set<UUID> = []
+    /// Account waarvan de eerste sync (volledige backfill) nu loopt; geldt over overlappende poll()-aanroepen heen.
+    private var firstSyncAccount: UUID?
 
     public init(
         makeProvider: @escaping ProviderFactory,
@@ -110,10 +112,10 @@ public actor PollEngine {
         let t = now()
         forget(except: Set(accounts.map(\.id)))
 
-        // Hooguit één eerste sync (volledige backfill) per cyclus, zodat de backfills van meerdere
-        // accounts niet samen de zoek-ratelimit opmaken. Andere accounts houden hun `nextSyncDue`
-        // en komen in een volgende cyclus aan de beurt; vervolg-syncs lopen gewoon mee.
-        var firstSyncTaken = false
+        // Hooguit één eerste sync (volledige backfill) tegelijk, ook als poll() overlapt (bv. "Nu
+        // verversen" naast de timer), zodat de backfills van meerdere accounts niet samen de
+        // zoek-ratelimit opmaken. Andere accounts houden hun `nextSyncDue` en komen later aan de
+        // beurt; vervolg-syncs lopen gewoon mee.
         let jobs = accounts
             .filter { !inFlight.contains($0.id) && (schedules[$0.id]?.nextDue ?? .distantPast) <= t }
             .map { account in
@@ -121,7 +123,7 @@ public actor PollEngine {
                 let syncDue = (schedules[account.id]?.nextSyncDue ?? .distantPast) <= t
                 var sync = syncDue ? syncRequest(for: account, retention: retention, at: t) : nil
                 if let request = sync, request.isFirst {
-                    if firstSyncTaken { sync = nil } else { firstSyncTaken = true }
+                    if firstSyncAccount == nil { firstSyncAccount = account.id } else { sync = nil }
                 }
                 return (
                     account: account,
@@ -166,6 +168,7 @@ public actor PollEngine {
                     }
                 }
                 inFlight.remove(id)
+                if firstSyncAccount == id { firstSyncAccount = nil }
             }
         }
 

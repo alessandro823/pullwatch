@@ -687,6 +687,31 @@ private struct Harness {
         #expect(await h.provider(b).lastSyncSince == Date??.some(h.clock.now - 365 * day))
     }
 
+    @Test func firstSyncLimitHoldsAcrossOverlappingPolls() async {
+        let a = Account.fixture()
+        let b = Account.fixture()
+        let gated = GatedProvider()
+        let mock = MockProvider()
+        let clock = TestClock()
+        let engine = PollEngine(makeProvider: { $0.id == a.id ? gated as any PRProvider : mock }, store: nil, now: { clock.now })
+
+        // A's eerste sync loopt nog (poll hangt) wanneer "Nu verversen" een tweede poll start.
+        let first = Task { await engine.poll(accounts: [a, b], interval: 120, retention: .oneYear) }
+        for await _ in gated.started { break }
+        #expect(await mock.syncCount == 0)
+
+        await engine.forceRefresh()
+        _ = await engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        #expect(await mock.syncCount == 0)
+
+        await gated.release()
+        _ = await first.value
+        // A is klaar (gated blokkeert elke fetch, dus alleen B pollen): nu mag B's eerste sync.
+        clock.advance(120)
+        _ = await engine.poll(accounts: [b], interval: 120, retention: .oneYear)
+        #expect(await mock.syncCount == 1)
+    }
+
     @Test func incrementalSyncsRunTogetherInOneCycle() async {
         let a = Account.fixture()
         let b = Account.fixture()
