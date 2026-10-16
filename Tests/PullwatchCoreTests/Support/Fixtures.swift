@@ -27,6 +27,22 @@ extension PullRequest {
     }
 }
 
+extension Tag {
+    static func fixture(
+        accountId: UUID = fixedAccountId,
+        repo: String = "proj/api",
+        name: String = "v1"
+    ) -> Tag {
+        Tag(
+            accountId: accountId,
+            repo: repo,
+            name: name,
+            authorName: "Someone",
+            webURL: URL(string: "https://example.com/\(repo)/tag/\(name)")!
+        )
+    }
+}
+
 extension Account {
     static func fixture(
         id: UUID = UUID(),

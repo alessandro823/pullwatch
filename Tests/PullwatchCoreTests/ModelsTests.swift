@@ -57,6 +57,11 @@ import Testing
         #expect(pr.dedupKey == "00000000-0000-0000-0000-000000000001:proj/api:42")
     }
 
+    @Test func tagDedupKeyIsDistinctFromPR() {
+        let tag = Tag.fixture(repo: "Proj/API", name: "v1")
+        #expect(tag.dedupKey == "00000000-0000-0000-0000-000000000001:proj/api:tag:v1")
+    }
+
     @Test func jsonFileStoreReturnsNilWhenMissingAndRoundTrips() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }

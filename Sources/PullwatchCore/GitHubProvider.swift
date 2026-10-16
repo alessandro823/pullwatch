@@ -88,6 +88,10 @@ public actor GitHubProvider: PRProvider {
         return result
     }
 
+    public func tags(in repos: [String]) async throws -> [Tag] {
+        throw ProviderError.decoding("tags nog niet")
+    }
+
     public func invalidateCredentials() async {
         await tokenSource.invalidate()
     }

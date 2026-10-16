@@ -10,6 +10,9 @@ public protocol PRProvider: Sendable {
     func listRepos() async throws -> [String]
     /// Alle open PR's inclusief drafts, ongefilterd.
     func openPullRequests() async throws -> [PullRequest]
+    /// Tags van de opgegeven repos; `Tag.repo` is exact de doorgegeven repo-string.
+    /// Een repo die 404 geeft wordt overgeslagen.
+    func tags(in repos: [String]) async throws -> [Tag]
     /// Gooi gecachte tokens weg (na een 401).
     func invalidateCredentials() async
 }

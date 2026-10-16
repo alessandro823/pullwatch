@@ -5,10 +5,13 @@ actor MockProvider: PRProvider {
     private var userId = "me"
     private var pullRequests: [PullRequest] = []
     private var error: ProviderError?
+    private var tagList: [Tag] = []
     private(set) var fetchCount = 0
+    private(set) var tagFetchCount = 0
     private(set) var invalidateCount = 0
 
     func set(pullRequests: [PullRequest]) { self.pullRequests = pullRequests }
+    func set(tags: [Tag]) { tagList = tags }
     func set(error: ProviderError?) { self.error = error }
 
     func currentUserId() async throws -> String {
@@ -27,6 +30,13 @@ actor MockProvider: PRProvider {
         fetchCount += 1
         if let error { throw error }
         return pullRequests
+    }
+
+    func tags(in repos: [String]) async throws -> [Tag] {
+        tagFetchCount += 1
+        if let error { throw error }
+        let wanted = Set(repos.map { $0.lowercased() })
+        return tagList.filter { wanted.contains($0.repo.lowercased()) }
     }
 
     func invalidateCredentials() async { invalidateCount += 1 }
@@ -58,5 +68,6 @@ actor GatedProvider: PRProvider {
         return []
     }
 
+    func tags(in repos: [String]) async throws -> [Tag] { [] }
     func invalidateCredentials() async {}
 }

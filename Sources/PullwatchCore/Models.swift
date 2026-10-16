@@ -188,3 +188,21 @@ public struct PullRequest: Codable, Hashable, Sendable {
 
     public var dedupKey: String { "\(accountId.uuidString):\(repo):\(number)" }
 }
+
+public struct Tag: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let repo: String
+    public let name: String
+    public let authorName: String?
+    public let webURL: URL
+
+    public init(accountId: UUID, repo: String, name: String, authorName: String?, webURL: URL) {
+        self.accountId = accountId
+        self.repo = repo
+        self.name = name
+        self.authorName = authorName
+        self.webURL = webURL
+    }
+
+    public var dedupKey: String { "\(accountId.uuidString):\(repo.lowercased()):tag:\(name)" }
+}

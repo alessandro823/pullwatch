@@ -89,6 +89,10 @@ public actor AzureDevOpsProvider: PRProvider {
         return result
     }
 
+    public func tags(in repos: [String]) async throws -> [Tag] {
+        throw ProviderError.decoding("tags nog niet")
+    }
+
     public func invalidateCredentials() async {
         projectCache = nil
         await tokenSource.invalidate()
