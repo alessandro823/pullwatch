@@ -68,28 +68,40 @@ struct MenuView: View {
             }
         }
         .padding(12)
-        .frame(width: 360)
+        .frame(width: 460)
     }
 }
 
 struct SettingsButton: View {
-    @Environment(\.openWindow) private var openWindow
-
     var body: some View {
-        Button("Instellingen…") {
-            openWindow(id: "settings")
-            NSApp.activate()
-        }
+        OpenWindowButton(title: "Instellingen…", windowId: "settings")
     }
 }
 
 struct HistoryButton: View {
+    var body: some View {
+        OpenWindowButton(title: "Geschiedenis…", windowId: "history")
+    }
+}
+
+/// Opent een venster vanuit het menu: sluit eerst het menu-paneel (anders blijft het erboven
+/// hangen) en haalt het venster daarna naar voren.
+private struct OpenWindowButton: View {
+    let title: String
+    let windowId: String
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Geschiedenis…") {
-            openWindow(id: "history")
+        Button(title) {
+            let menuPanel = NSApp.keyWindow
+            openWindow(id: windowId)
+            menuPanel?.orderOut(nil)
             NSApp.activate()
+            DispatchQueue.main.async {
+                NSApp.windows
+                    .first { $0.identifier?.rawValue.hasPrefix(windowId) == true }?
+                    .makeKeyAndOrderFront(nil)
+            }
         }
     }
 }
