@@ -82,6 +82,14 @@ struct AccountEditor: View {
                                     .disabled(filteredRepos.isEmpty)
                                 Text("Tags").font(.caption).foregroundStyle(ItemKind.tag.color)
                             }
+                            HStack(spacing: 4) {
+                                Toggle("Alle completed", sources: filteredRepos.map { binding(for: $0, \.completed) }, isOn: \.self)
+                                    .tint(PRState.merged.color)
+                                    .help("Completed aan/uit voor alle zichtbare repo's")
+                                    .disabled(filteredRepos.isEmpty)
+                                Text("Completed").font(.caption).foregroundStyle(PRState.merged.color)
+                            }
+                            .help("Melding als een PR in deze repo gemerged wordt (binnen ~15 minuten)")
                         }
                         Divider()
                         ForEach(filteredRepos, id: \.self) { repo in
@@ -94,6 +102,8 @@ struct AccountEditor: View {
                                     .tint(ItemKind.pullRequest.color)
                                 Toggle("Tags", isOn: binding(for: repo, \.tags))
                                     .tint(ItemKind.tag.color)
+                                Toggle("Completed", isOn: binding(for: repo, \.completed))
+                                    .tint(PRState.merged.color)
                             }
                         }
                     }

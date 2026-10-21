@@ -221,8 +221,12 @@ final class AppModel {
         if history.merge(synced: result.syncedPullRequests, notBefore: cutoff) { changed = true }
         if history.prune(now: now, retention: config.historyRetention) { changed = true }
         if changed { saveHistory() }
-        if hasNotified {
-            notifier.deliver(NotificationPlanner.plan(pullRequests: result.newPullRequests, tags: result.newTags))
+        if hasNotified || !result.completedPullRequests.isEmpty {
+            notifier.deliver(NotificationPlanner.plan(
+                pullRequests: result.newPullRequests,
+                tags: result.newTags,
+                completed: result.completedPullRequests
+            ))
         }
         for id in result.authFailures {
             if let account = config.accounts.first(where: { $0.id == id }) {

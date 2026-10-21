@@ -21,10 +21,25 @@ public enum FilterMode: String, Codable, Hashable, Sendable, CaseIterable {
 public struct WatchSet: Codable, Hashable, Sendable {
     public var prs: Bool
     public var tags: Bool
+    /// Melding als een PR in deze repo gemerged (completed) wordt.
+    public var completed: Bool
 
-    public init(prs: Bool, tags: Bool) {
+    public init(prs: Bool, tags: Bool, completed: Bool = false) {
         self.prs = prs
         self.tags = tags
+        self.completed = completed
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case prs, tags, completed
+    }
+
+    /// Oude JSON heeft geen `completed`: dan staat het uit.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        prs = try c.decode(Bool.self, forKey: .prs)
+        tags = try c.decode(Bool.self, forKey: .tags)
+        completed = try c.decodeIfPresent(Bool.self, forKey: .completed) ?? false
     }
 
     public static let none = WatchSet(prs: false, tags: false)

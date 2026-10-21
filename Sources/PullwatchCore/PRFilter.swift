@@ -98,8 +98,14 @@ public enum PRFilter {
         settings.watch(for: repo).prs
     }
 
-    public static func passes(_ pr: PullRequest, settings: FilterSettings, currentUserId: String?) -> Bool {
-        guard follows(repo: pr.repo, settings: settings) else { return false }
+    /// `watching` kiest welk vinkje de repo moet hebben: PR's (standaard) of completed.
+    public static func passes(
+        _ pr: PullRequest,
+        settings: FilterSettings,
+        currentUserId: String?,
+        watching field: KeyPath<WatchSet, Bool> = \.prs
+    ) -> Bool {
+        guard settings.watch(for: pr.repo)[keyPath: field] else { return false }
         if pr.isDraft && !settings.includeDrafts { return false }
         if settings.hideOwn, let me = currentUserId,
            pr.authorId.caseInsensitiveCompare(me) == .orderedSame {

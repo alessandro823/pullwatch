@@ -31,4 +31,14 @@ import Testing
         #expect(NotificationPlanner.plan(pullRequests: [pr], tags: tags)
             == [.pullRequest(pr), .summary(kind: .tag, count: 4, lines: ["p/r: v1", "p/r: v2", "p/r: v3"])])
     }
+
+    @Test func completedComeLastAndSummarizeSeparately() {
+        let pr = PullRequest.fixture(number: 1)
+        let one = PullRequest.fixture(number: 2, state: .merged)
+        #expect(NotificationPlanner.plan(pullRequests: [pr], tags: [], completed: [one]) == [.pullRequest(pr), .completed(one)])
+
+        let many = (1...4).map { PullRequest.fixture(repo: "p/r", number: $0, title: "T\($0)", state: .merged) }
+        #expect(NotificationPlanner.plan(pullRequests: [], tags: [], completed: many)
+            == [.summary(kind: .completed, count: 4, lines: ["p/r: T1", "p/r: T2", "p/r: T3"])])
+    }
 }

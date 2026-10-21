@@ -19,6 +19,9 @@ public struct PollResult: Equatable, Sendable {
     /// PR's (alle states) uit de geschiedenis-sync, gefilterd met `PRFilter`. Leeg als er
     /// geen sync aan de beurt was of die mislukte. Niet bedoeld voor meldingen.
     public var syncedPullRequests: [PullRequest] = []
+    /// PR's die sinds de vorige geschiedenis-sync gemerged zijn in repo's met "Completed" aan,
+    /// gesorteerd op `closedAt`.
+    public var completedPullRequests: [PullRequest] = []
 }
 
 public actor PollEngine {
@@ -176,7 +179,9 @@ public actor PollEngine {
                     let fresh = handleSuccess(job.account, fetched, at: t, interval: interval)
                     result.newPullRequests += fresh.pullRequests
                     result.newTags += fresh.tags
-                    result.syncedPullRequests += handleSync(job.account, fetched, retention: retention, at: t)
+                    let sync = handleSync(job.account, fetched, request: job.sync, retention: retention, at: t)
+                    result.syncedPullRequests += sync.pullRequests
+                    result.completedPullRequests += sync.completed
                     succeeded.append(id)
                 case .failure(let error):
                     if await handleFailure(job.account, job.provider, error, at: t, interval: interval) {
@@ -198,6 +203,7 @@ public actor PollEngine {
 
         result.newPullRequests.sort { $0.createdAt < $1.createdAt }
         result.newTags.sort { ($0.repo, $0.name) < ($1.repo, $1.name) }
+        result.completedPullRequests.sort { ($0.closedAt ?? .distantPast) < ($1.closedAt ?? .distantPast) }
         result.statuses = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, statuses[$0.id] ?? .idle) })
         return result
     }
@@ -348,14 +354,16 @@ public actor PollEngine {
         return (fresh, handleTags(account, fetched, at: t))
     }
 
-    /// Verwerkt de geschiedenis-sync: plant de volgende sync en geeft de gefilterde PR's terug.
-    /// Markeert niets in `seen`; meldingen blijven bij de open-PR-poll.
+    /// Verwerkt de geschiedenis-sync: plant de volgende sync en geeft de gefilterde PR's terug,
+    /// plus de PR's die sinds de vorige sync gemerged zijn (zie `completed`). Markeert geen
+    /// PR-dedupKeys in `seen`; meldingen van nieuwe PR's blijven bij de open-PR-poll.
     private func handleSync(
         _ account: Account,
         _ fetched: Fetched,
+        request: SyncRequest?,
         retention: HistoryRetention,
         at t: Date
-    ) -> [PullRequest] {
+    ) -> (pullRequests: [PullRequest], completed: [PullRequest]) {
         var schedule = schedules[account.id] ?? Schedule()
         defer { schedules[account.id] = schedule }
 
@@ -367,14 +375,42 @@ public actor PollEngine {
                 schedule.nextSyncDue = t + Self.tagInterval
             }
             logger.warning("geschiedenis-sync mislukt voor \(account.displayName, privacy: .public): \(error.userMessage, privacy: .public)")
-            return []
+            return ([], [])
         }
-        guard let synced = fetched.synced else { return [] }
+        guard let synced = fetched.synced else { return ([], []) }
 
         let settings = account.filterSettings
+        // Een eerste sync seedt stil: dan is er geen vorige sync om tegen te vergelijken.
+        let previous = request?.isFirst == false ? state.syncMarks[account.id.uuidString] : nil
+        let newlyCompleted = completed(account, synced, previous: previous, userId: fetched.userId, at: t)
         state.syncMarks[account.id.uuidString] = SyncMark(at: t, settings: settings, retention: retention)
         schedule.nextSyncDue = t + Self.tagInterval
-        return synced.filter { PRFilter.passes($0, settings: settings, currentUserId: fetched.userId) }
+        return (synced.filter { PRFilter.passes($0, settings: settings, currentUserId: fetched.userId) }, newlyCompleted)
+    }
+
+    /// Gemergde PR's in repo's met "Completed" aan die gemeld moeten worden: de repo had het ook
+    /// al bij de vorige sync aan (aanzetten seedt stil), de merge is van na die sync (min overlap)
+    /// en de PR is nog niet gemeld. Alle gemergde PR's worden als gezien gemarkeerd.
+    private func completed(
+        _ account: Account,
+        _ synced: [PullRequest],
+        previous: SyncMark?,
+        userId: String,
+        at t: Date
+    ) -> [PullRequest] {
+        let settings = account.filterSettings
+        var fresh: [PullRequest] = []
+        for pr in synced where pr.state == .merged
+            && PRFilter.passes(pr, settings: settings, currentUserId: userId, watching: \.completed) {
+            let key = pr.dedupKey + ":completed"
+            if let previous, !state.contains(key),
+               PRFilter.passes(pr, settings: previous.settings, currentUserId: userId, watching: \.completed),
+               let closedAt = pr.closedAt, closedAt >= previous.at - Self.syncOverlap {
+                fresh.append(pr)
+            }
+            state.mark(key, at: t)
+        }
+        return fresh
     }
 
     /// Eerste tag-poll per repo is stil; daarna wordt elke onbekende tag gemeld.

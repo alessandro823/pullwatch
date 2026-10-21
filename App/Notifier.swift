@@ -47,8 +47,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
                 content.body = tag.authorName.map { "\(tag.name) — \($0)" } ?? tag.name
                 content.userInfo = ["url": tag.webURL.absoluteString, "key": tag.dedupKey]
                 identifier = tag.dedupKey
+            case .completed(let pr):
+                content.title = "\(pr.repo): PR completed"
+                content.body = "\(pr.title) — \(pr.authorName)"
+                content.userInfo = ["url": pr.webURL.absoluteString, "key": pr.dedupKey]
+                identifier = pr.dedupKey + ":completed"
             case .summary(let kind, let count, let lines):
-                content.title = kind == .tag ? "\(count) nieuwe tags" : "\(count) nieuwe PR's"
+                switch kind {
+                case .pullRequest: content.title = "\(count) nieuwe PR's"
+                case .tag: content.title = "\(count) nieuwe tags"
+                case .completed: content.title = "\(count) PR's completed"
+                }
                 content.body = lines.joined(separator: "\n")
                 identifier = UUID().uuidString
             }

@@ -154,4 +154,16 @@ import Testing
         try store.save(accounts)
         #expect(try store.load() == accounts)
     }
+
+    @Test func watchSetWithoutCompletedDecodesAsOff() throws {
+        let set = try JSONDecoder().decode(WatchSet.self, from: Data(#"{"prs":true,"tags":false}"#.utf8))
+        #expect(set == .prs)
+        #expect(!set.completed)
+    }
+
+    @Test func setWatchKeepsCompletedEntry() {
+        var a = Account.fixture(repoWatch: [:], newRepoDefault: .prs)
+        a.setWatch(WatchSet(prs: true, tags: false, completed: true), for: "o/a")
+        #expect(a.watch(for: "o/a").completed)
+    }
 }

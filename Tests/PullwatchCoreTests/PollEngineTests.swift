@@ -790,4 +790,85 @@ private struct Harness {
         #expect(await h.provider(account).syncCount == 2)
         #expect(await h.provider(account).lastSyncSince == Date??.some(h.clock.now - 365 * day))
     }
+
+    // MARK: - Completed
+
+    private static let completedOnly = WatchSet(prs: false, tags: false, completed: true)
+
+    @Test func firstSyncSeedsMergesSilentlyThenNotifiesNewMerge() async {
+        let account = Account.fixture(repoWatch: ["proj/api": Self.completedOnly], newRepoDefault: .none)
+        let h = Harness(accounts: [account])
+        let old = PullRequest.fixture(accountId: account.id, number: 1, state: .merged, closedAt: h.clock.now - 100)
+        await h.provider(account).set(syncedPullRequests: [old])
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests.isEmpty)
+
+        h.clock.advance(900)
+        let fresh = PullRequest.fixture(accountId: account.id, number: 2, state: .merged, closedAt: h.clock.now - 10)
+        await h.provider(account).set(syncedPullRequests: [old, fresh])
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests == [fresh])
+
+        // Volgende sync ziet hem opnieuw (overlap) maar meldt niet nog eens.
+        h.clock.advance(900)
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests.isEmpty)
+    }
+
+    @Test func completedNeedsItsOwnFlagAndIgnoresAbandoned() async {
+        let account = Account.fixture(
+            repoWatch: ["proj/api": Self.completedOnly, "proj/web": .prs],
+            newRepoDefault: .none
+        )
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+
+        h.clock.advance(900)
+        let merged = PullRequest.fixture(accountId: account.id, repo: "proj/api", number: 1, state: .merged, closedAt: h.clock.now)
+        let abandoned = PullRequest.fixture(accountId: account.id, repo: "proj/api", number: 2, state: .closed, closedAt: h.clock.now)
+        let otherRepo = PullRequest.fixture(accountId: account.id, repo: "proj/web", number: 3, state: .merged, closedAt: h.clock.now)
+        await h.provider(account).set(syncedPullRequests: [merged, abandoned, otherRepo])
+        let result = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+        #expect(result.completedPullRequests == [merged])
+        #expect(result.syncedPullRequests == [otherRepo])
+    }
+
+    @Test func oldMergeThatWasUpdatedLaterIsNotNotified() async {
+        let account = Account.fixture(repoWatch: ["proj/api": Self.completedOnly], newRepoDefault: .none)
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+
+        h.clock.advance(900)
+        let old = PullRequest.fixture(accountId: account.id, number: 1, state: .merged, closedAt: h.clock.now - 10 * day)
+        await h.provider(account).set(syncedPullRequests: [old])
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests.isEmpty)
+    }
+
+    @Test func turningOnCompletedSeedsSilently() async {
+        var account = Account.fixture(repoWatch: ["proj/api": .prs], newRepoDefault: .none)
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+
+        account.setWatch(WatchSet(prs: true, tags: false, completed: true), for: "proj/api")
+        h.clock.advance(900)
+        let merged = PullRequest.fixture(accountId: account.id, number: 1, state: .merged, closedAt: h.clock.now - 60)
+        await h.provider(account).set(syncedPullRequests: [merged])
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests.isEmpty)
+        // Aanzetten is geen sync-scopewijziging: de sync blijft een vervolg-sync.
+        #expect(await h.provider(account).lastSyncSince == Date??.some(h.clock.now - 900 - 3600))
+
+        h.clock.advance(900)
+        let next = PullRequest.fixture(accountId: account.id, number: 2, state: .merged, closedAt: h.clock.now - 60)
+        await h.provider(account).set(syncedPullRequests: [merged, next])
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests == [next])
+    }
+
+    @Test func ownMergesAreHiddenWithHideOwn() async {
+        let account = Account.fixture(repoWatch: ["proj/api": Self.completedOnly], newRepoDefault: .none, hideOwn: true)
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+
+        h.clock.advance(900)
+        let mine = PullRequest.fixture(accountId: account.id, number: 1, authorId: "me", state: .merged, closedAt: h.clock.now)
+        let theirs = PullRequest.fixture(accountId: account.id, number: 2, authorId: "colleague", state: .merged, closedAt: h.clock.now)
+        await h.provider(account).set(syncedPullRequests: [mine, theirs])
+        #expect(await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear).completedPullRequests == [theirs])
+    }
 }
