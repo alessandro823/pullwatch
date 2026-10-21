@@ -14,6 +14,14 @@ final class AppModel {
     private(set) var history: History
     private(set) var statuses: [UUID: AccountState] = [:]
     private(set) var notificationsAllowed = true
+    /// Voortgang van "Opnieuw ophalen"; `nil` als er niets loopt.
+    private(set) var refetch: RefetchProgress?
+
+    struct RefetchProgress: Equatable {
+        let startedAt: Date
+        var done: Int
+        let total: Int
+    }
 
     @ObservationIgnored private let configStore = JSONFileStore<AppConfig>(url: AppPaths.file("config.json"))
     @ObservationIgnored private let historyStore = JSONFileStore<History>(url: AppPaths.file("history.json"))
@@ -104,6 +112,23 @@ final class AppModel {
                 try? await Task.sleep(for: .seconds(15))
             }
         }
+    }
+
+    /// Haalt de geschiedenis van alle accounts opnieuw op (stil, gelezen-status blijft).
+    func refetchHistory() async {
+        let total = config.pollableAccounts.count
+        guard total > 0 else { return }
+        refetch = RefetchProgress(startedAt: Date(), done: 0, total: total)
+        await engine.resetHistorySync()
+        await tick()
+    }
+
+    private func updateRefetchProgress() async {
+        guard var progress = refetch else { return }
+        let ids = config.pollableAccounts.map(\.id)
+        let synced = await engine.lastHistorySync(for: ids)
+        progress.done = synced.values.filter { $0 >= progress.startedAt }.count
+        refetch = progress.done >= progress.total ? nil : progress
     }
 
     func refreshNow() async {
@@ -204,6 +229,7 @@ final class AppModel {
                 notifier.deliverAuthFailure(accountName: account.displayName)
             }
         }
+        await updateRefetchProgress()
     }
 
     private func saveConfig() {

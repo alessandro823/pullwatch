@@ -93,6 +93,22 @@ public actor PollEngine {
         }
     }
 
+    /// Vergeet alle sync-markeringen en pollt meteen, zodat elk account de geschiedenis binnen de
+    /// bewaartermijn opnieuw ophaalt (één account tegelijk, zoals bij de eerste sync).
+    public func resetHistorySync() {
+        state.syncMarks = [:]
+        forceRefresh()
+    }
+
+    /// Tijdstip van de laatste geslaagde sync per account (alleen accounts met een sync).
+    public func lastHistorySync(for ids: [UUID]) -> [UUID: Date] {
+        var result: [UUID: Date] = [:]
+        for id in ids {
+            if let mark = state.syncMarks[id.uuidString] { result[id] = mark.at }
+        }
+        return result
+    }
+
     public func forceRefresh() {
         let t = now()
         for (id, var schedule) in schedules {

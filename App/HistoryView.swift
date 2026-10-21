@@ -38,6 +38,19 @@ struct HistoryView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
+                if let progress = model.refetch {
+                    ProgressView(value: Double(progress.done), total: Double(progress.total))
+                        .frame(width: 100)
+                    Text("Ophalen… \(progress.done)/\(progress.total) accounts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } else {
+                    Button("Opnieuw ophalen") {
+                        Task { await model.refetchHistory() }
+                    }
+                    .help("Haalt de PR's van alle accounts opnieuw op binnen de bewaartermijn, één account tegelijk (zonder meldingen)")
+                }
             }
 
             Table(items, selection: $selection) {

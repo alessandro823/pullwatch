@@ -712,6 +712,31 @@ private struct Harness {
         #expect(await mock.syncCount == 1)
     }
 
+    @Test func resetHistorySyncStartsFirstSyncAgainNow() async {
+        let account = Account.fixture()
+        let h = Harness(accounts: [account])
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+        #expect(await h.provider(account).syncCount == 1)
+
+        h.clock.advance(10)
+        await h.engine.resetHistorySync()
+        _ = await h.engine.poll(accounts: [account], interval: 120, retention: .oneYear)
+        #expect(await h.provider(account).syncCount == 2)
+        #expect(await h.provider(account).lastSyncSince == Date??.some(h.clock.now - 365 * day))
+    }
+
+    @Test func lastHistorySyncReportsSuccessfulSyncsOnly() async {
+        let a = Account.fixture()
+        let b = Account.fixture()
+        let h = Harness(accounts: [a, b])
+        await h.provider(b).set(syncError: .server(status: 500))
+        _ = await h.engine.poll(accounts: [a, b], interval: 120, retention: .oneYear)
+        #expect(await h.engine.lastHistorySync(for: [a.id, b.id]) == [a.id: h.clock.now])
+
+        await h.engine.resetHistorySync()
+        #expect(await h.engine.lastHistorySync(for: [a.id, b.id]).isEmpty)
+    }
+
     @Test func incrementalSyncsRunTogetherInOneCycle() async {
         let a = Account.fixture()
         let b = Account.fixture()
