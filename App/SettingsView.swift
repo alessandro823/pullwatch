@@ -110,6 +110,11 @@ private struct GeneralSettingsView: View {
                     Text(retention.label).tag(retention)
                 }
             }
+            Toggle("Versies en CVE's dagelijks checken", isOn: Binding(
+                get: { model.config.autoVersionCheck },
+                set: { model.setAutoVersionCheck($0) }
+            ))
+            .help("Eens per dag automatisch; melding als er bij een gevolgde repo een nieuwe CVE bijkomt")
             Toggle("Starten bij inloggen", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, enabled in
                     do {

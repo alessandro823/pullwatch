@@ -99,3 +99,13 @@ Gebruiker vroeg: CVE-check via OSV.dev en een kopieerknop per repo.
 - Sorteren: een repo met kwetsbaarheden weegt als EOL, daarna meeste kwetsbaarheden (Claude's call). Stip rood.
 - UI: uitklapbare regel "N kwetsbaarheden (x critical, …)" met ernst-pill, CVE-link naar osv.dev, `package versie → fix`, samenvatting. Zoeken ook op package en CVE/OSV-id.
 - Kopieerknop per repo: repo, onderdelen met status, kwetsbaarheden met ernst, package, fix en link, als platte tekst.
+
+## Uitbreiding 2026-10-23: dagelijks automatisch
+
+Gebruiker koos: check vanzelf, melding bij nieuwe CVE's (vervangt "alleen op knopdruk").
+
+- `AppConfig.autoVersionCheck` (standaard aan), schakelaar onder Instellingen → Algemeen.
+- Elke 24 uur na de vorige check (handmatig telt mee), gecontroleerd in de poll-lus.
+- Melding alleen voor CVE's (id + package) die er bij de vorige check voor die repo nog niet waren. Geen melding zonder vorige check, voor nieuw gevolgde repo's, of als de vorige CVE-check of scan van die repo mislukte (Claude's call: geen stortvloed).
+- Tot 3 losse meldingen (klik opent osv.dev), anders één samenvatting.
+- Automatische check waarbij elke repo een fout gaf: resultaat weggooien, opnieuw na 1 uur.

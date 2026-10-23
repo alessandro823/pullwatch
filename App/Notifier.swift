@@ -66,6 +66,32 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// Tot drie losse meldingen (klik opent de OSV-pagina), daarboven één samenvatting.
+    func deliverVulnerabilities(_ items: [(repo: String, vulnerability: Vulnerability)]) {
+        func line(_ v: Vulnerability) -> String {
+            let severity = v.severity.map { " [\($0.capitalized)]" } ?? ""
+            let fix = v.fixedIn.map { " → \($0)" } ?? ""
+            return "\(v.cve ?? v.id)\(severity) \(v.package) \(v.version)\(fix)"
+        }
+        if items.count <= 3 {
+            for (repo, v) in items {
+                let content = UNMutableNotificationContent()
+                content.title = "\(repo): nieuwe kwetsbaarheid"
+                content.body = [line(v), v.summary].compactMap { $0 }.joined(separator: "\n")
+                content.userInfo = ["url": v.url.absoluteString]
+                content.sound = .default
+                add(UNNotificationRequest(identifier: "cve-\(repo)-\(v.id)-\(v.package)", content: content, trigger: nil))
+            }
+        } else {
+            let content = UNMutableNotificationContent()
+            content.title = "\(items.count) nieuwe kwetsbaarheden"
+            content.body = (items.prefix(3).map { "\($0.repo): \(line($0.vulnerability))" } + ["Zie Versies… in het menu"])
+                .joined(separator: "\n")
+            content.sound = .default
+            add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
+    }
+
     func deliverAuthFailure(accountName: String) {
         let content = UNMutableNotificationContent()
         content.title = "Pullwatch: \(accountName)"

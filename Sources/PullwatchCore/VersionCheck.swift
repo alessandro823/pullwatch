@@ -90,6 +90,35 @@ public struct VersionReport: Codable, Equatable, Sendable {
     }
 }
 
+extension VersionReport {
+    /// Automatische check: eens per dag.
+    public static let autoInterval: TimeInterval = 24 * 3600
+    /// Na een volledig mislukte automatische check (bv. offline) opnieuw na een uur.
+    public static let autoRetryInterval: TimeInterval = 3600
+
+    /// Elke repo gaf een fout: geen bruikbaar resultaat (bv. geen netwerk).
+    public var failedCompletely: Bool {
+        !repos.isEmpty && repos.allSatisfy { $0.error != nil }
+    }
+
+    /// Kwetsbaarheden die in `previous` nog niet voor die repo bestonden. Zonder vorige check,
+    /// voor een repo die er toen niet bij zat of waarvan de CVE-check toen mislukte, telt
+    /// alles als bekend: anders komt er een stortvloed aan meldingen.
+    public func newVulnerabilities(since previous: VersionReport?) -> [(repo: String, vulnerability: Vulnerability)] {
+        guard let previous else { return [] }
+        let before = Dictionary(previous.repos.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var result: [(repo: String, vulnerability: Vulnerability)] = []
+        for repo in repos {
+            guard let old = before[repo.id], old.error == nil, old.vulnerabilityError == nil else { continue }
+            let known = Set(old.vulnerabilities.map { "\($0.id)|\($0.package)" })
+            for vulnerability in repo.vulnerabilities where !known.contains("\(vulnerability.id)|\(vulnerability.package)") {
+                result.append((repo.repo, vulnerability))
+            }
+        }
+        return result
+    }
+}
+
 /// Leest per gevolgde repo de projectbestanden, vergelijkt de gevonden versies met endoflife.date
 /// en zoekt bekende kwetsbaarheden in de packages via OSV.dev.
 public struct VersionChecker: Sendable {

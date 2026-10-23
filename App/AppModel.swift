@@ -37,6 +37,8 @@ final class AppModel {
     )
     @ObservationIgnored private let notifier = Notifier.shared
     @ObservationIgnored private var loopTask: Task<Void, Never>?
+    /// Vroegste moment voor de volgende automatische versiecheck (na een mislukte of lopende poging).
+    @ObservationIgnored private var nextAutoVersionAttempt: Date?
 
     private init() {
         do {
@@ -119,6 +121,7 @@ final class AppModel {
             guard let self else { return }
             while !Task.isCancelled {
                 await self.tick()
+                self.startAutoVersionCheckIfDue()
                 try? await Task.sleep(for: .seconds(15))
             }
         }
@@ -133,16 +136,37 @@ final class AppModel {
         await tick()
     }
 
-    /// Leest per gevolgde repo de taal- en frameworkversies en vergelijkt ze met endoflife.date.
-    func checkVersions() async {
+    /// Eens per dag (`VersionReport.autoInterval`) vanzelf, als de instelling aan staat.
+    private func startAutoVersionCheckIfDue() {
+        guard config.autoVersionCheck, versionCheck == nil, !config.pollableAccounts.isEmpty else { return }
+        let now = Date()
+        if let nextAutoVersionAttempt, now < nextAutoVersionAttempt { return }
+        if let last = versionReport?.checkedAt, now.timeIntervalSince(last) < VersionReport.autoInterval { return }
+        nextAutoVersionAttempt = now + VersionReport.autoRetryInterval
+        Task { await checkVersions(automatic: true) }
+    }
+
+    /// Leest per gevolgde repo de taal- en frameworkversies, vergelijkt ze met endoflife.date en zoekt CVE's.
+    /// Automatisch: een volledig mislukte check (bv. offline) overschrijft het vorige resultaat niet,
+    /// en nieuwe CVE's ten opzichte van de vorige check geven een melding.
+    func checkVersions(automatic: Bool = false) async {
         guard versionCheck == nil else { return }
         versionCheck = (0, 0)
         let checker = VersionChecker(makeProvider: { ProviderFactory.make($0) })
         let report = await checker.run(accounts: config.pollableAccounts) { done, total in
             await MainActor.run { [weak self] in self?.versionCheck = (done, total) }
         }
-        versionReport = report
         versionCheck = nil
+        if automatic && report.failedCompletely {
+            logger.notice("automatische versiecheck mislukt, opnieuw over een uur")
+            return
+        }
+        let previous = versionReport
+        versionReport = report
+        if automatic {
+            let new = report.newVulnerabilities(since: previous)
+            if !new.isEmpty { notifier.deliverVulnerabilities(new) }
+        }
         do {
             try versionStore.save(report)
         } catch {
@@ -218,6 +242,11 @@ final class AppModel {
         config.pollInterval = seconds
         saveConfig()
         Task { await refreshNow() }
+    }
+
+    func setAutoVersionCheck(_ enabled: Bool) {
+        config.autoVersionCheck = enabled
+        saveConfig()
     }
 
     func setHistoryRetention(_ retention: HistoryRetention) {
