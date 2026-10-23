@@ -73,9 +73,19 @@ struct VersionsView: View {
                 if shown.isEmpty {
                     ContentUnavailableView.search(text: searchText)
                 } else {
-                    List(shown) { repo in
-                        RepoVersionsRow(repo: repo)
+                    // Geen List: op macOS groeit een List-rij niet mee als de CVE-lijst openklapt.
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(shown) { repo in
+                                RepoVersionsRow(repo: repo)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                Divider()
+                            }
+                        }
                     }
+                    .background(.background)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             } else {
                 ContentUnavailableView(
@@ -177,22 +187,29 @@ private struct VulnerabilityList: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(vulnerabilities, id: \.self) { vulnerability in
-                    VulnerabilityRow(vulnerability: vulnerability)
-                }
-            }
-        } label: {
-            // In een List reageert alleen het pijltje; zo klapt de hele regel open.
+        VStack(alignment: .leading, spacing: 4) {
             Button {
-                withAnimation { isExpanded.toggle() }
+                withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
             } label: {
-                Label(title, systemImage: "exclamationmark.shield")
-                    .foregroundStyle(VersionStatus.eol.color)
-                    .contentShape(Rectangle())
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .foregroundStyle(.secondary)
+                    Label(title, systemImage: "exclamationmark.shield")
+                        .foregroundStyle(VersionStatus.eol.color)
+                }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(vulnerabilities.enumerated()), id: \.offset) { _, vulnerability in
+                        VulnerabilityRow(vulnerability: vulnerability)
+                    }
+                }
+                .padding(.leading, 16)
+            }
         }
     }
 }
