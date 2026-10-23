@@ -164,6 +164,7 @@ private struct ComponentRow: View {
 
 private struct VulnerabilityList: View {
     let vulnerabilities: [Vulnerability]
+    @State private var isExpanded = false
 
     private var title: String {
         let count = vulnerabilities.count
@@ -176,15 +177,22 @@ private struct VulnerabilityList: View {
     }
 
     var body: some View {
-        DisclosureGroup {
+        DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(vulnerabilities, id: \.self) { vulnerability in
                     VulnerabilityRow(vulnerability: vulnerability)
                 }
             }
         } label: {
-            Label(title, systemImage: "exclamationmark.shield")
-                .foregroundStyle(VersionStatus.eol.color)
+            // In een List reageert alleen het pijltje; zo klapt de hele regel open.
+            Button {
+                withAnimation { isExpanded.toggle() }
+            } label: {
+                Label(title, systemImage: "exclamationmark.shield")
+                    .foregroundStyle(VersionStatus.eol.color)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 }
