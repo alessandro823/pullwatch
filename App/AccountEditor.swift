@@ -74,7 +74,13 @@ struct AccountEditor: View {
                     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
                         GridRow {
                             Text("Repo").font(.caption).foregroundStyle(.secondary)
-                            Text("PR's").font(.caption).foregroundStyle(ItemKind.pullRequest.color)
+                            HStack(spacing: 4) {
+                                Toggle("Alle PR's", sources: filteredRepos.map { binding(for: $0, \.prs) }, isOn: \.self)
+                                    .tint(ItemKind.pullRequest.color)
+                                    .help("PR's aan/uit voor alle zichtbare repo's")
+                                    .disabled(filteredRepos.isEmpty)
+                                Text("PR's").font(.caption).foregroundStyle(ItemKind.pullRequest.color)
+                            }
                             HStack(spacing: 4) {
                                 Toggle("Alle tags", sources: filteredRepos.map { binding(for: $0, \.tags) }, isOn: \.self)
                                     .tint(ItemKind.tag.color)
