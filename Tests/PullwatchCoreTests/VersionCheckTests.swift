@@ -151,3 +151,52 @@ private actor FileProvider: PRProvider {
         #expect(query.contains("path=/src/go.mod"))
     }
 }
+
+@Suite struct VersionCheckerVulnerabilityTests {
+    let now = Date(timeIntervalSince1970: 1_792_000_000)
+
+    func account() -> Account {
+        Account(kind: .gitHub, displayName: "Acme", organization: "acme", authMethod: .pat, repoWatch: ["acme/a": .prs, "acme/b": .prs])
+    }
+
+    @Test func attachesVulnerabilitiesPerRepoWithOneSharedQuery() async {
+        let http = MockHTTPClient()
+        http.on("querybatch", body: #"{"results":[{"vulns":[{"id":"GHSA-a"}]}]}"#)
+        http.on("vulns/GHSA-a", body: #"{"id":"GHSA-a","summary":"lek","database_specific":{"severity":"HIGH"},"affected":[{"package":{"name":"lodash","ecosystem":"npm"},"ranges":[{"events":[{"fixed":"4.17.21"}]}]}]}"#)
+        let lock = #"{"lockfileVersion":3,"packages":{"node_modules/lodash":{"version":"4.17.20"}}}"#
+        let provider = FileProvider(repos: ["acme/a", "acme/b"], files: [
+            "acme/a": ["package-lock.json": lock],
+            "acme/b": ["web/package-lock.json": lock, "package.json": "{}"],
+        ])
+
+        let report = await VersionChecker(makeProvider: { _ in provider }, http: http, now: { now }).run(accounts: [account()])
+
+        #expect(report.repos.count == 2)
+        for repo in report.repos {
+            #expect(repo.vulnerabilities.map(\.id) == ["GHSA-a"])
+            #expect(repo.vulnerabilities.first?.fixedIn == "4.17.21")
+            #expect(repo.severity == VersionStatus.eol.severity)
+        }
+        #expect(http.requests.filter { $0.url!.absoluteString.contains("querybatch") }.count == 1)
+    }
+
+    @Test func osvFailureIsReportedButVersionsRemain() async {
+        let http = MockHTTPClient()
+        http.on("querybatch", status: 500, body: "")
+        let provider = FileProvider(repos: ["acme/a"], files: ["acme/a": ["go.mod": "go 1.26\nrequire x.com/y v1.0.0\n"]])
+
+        let report = await VersionChecker(makeProvider: { _ in provider }, http: http, now: { now }).run(accounts: [account()])
+
+        let repo = report.repos.first
+        #expect(repo?.components.first?.label == "Go")
+        #expect(repo?.vulnerabilities.isEmpty == true)
+        #expect(repo?.vulnerabilityError?.hasPrefix("CVE-check mislukt") == true)
+    }
+
+    @Test func oldReportWithoutVulnerabilitiesDecodes() throws {
+        let json = #"{"accountId":"00000000-0000-0000-0000-000000000001","repo":"acme/a","components":[]}"#
+        let repo = try JSONDecoder().decode(RepoVersions.self, from: Data(json.utf8))
+        #expect(repo.vulnerabilities.isEmpty)
+        #expect(repo.vulnerabilityError == nil)
+    }
+}

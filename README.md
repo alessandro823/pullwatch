@@ -39,6 +39,8 @@ Aanroepen van `az` en `gh` time-outen na 20 seconden.
 
 Via **Versies…** in het menu check je welke gevolgde repo's (minstens één vinkje) achterlopen. Pullwatch leest per repo `go.mod`, `*.csproj`/`*.fsproj`/`Directory.Build.props`, `package.json` (Node, Angular, React, Vue, Next.js, Nuxt), `.nvmrc`, `pyproject.toml`, `.python-version` en `Dockerfile*` op de default branch, en vergelijkt de versies met [endoflife.date](https://endoflife.date). Status: **Actueel**, **Achter** (er is een nieuwere major/minor; patches tellen niet), **EOL** of **Onbekend**. De check draait alleen op knopdruk; het laatste resultaat blijft bewaard.
 
+Dezelfde check zoekt bekende kwetsbaarheden (CVE's) via [OSV.dev](https://osv.dev) in packages met een exacte versie: `go.mod` (requires), `package-lock.json`, `PackageReference`/`PackageVersion` in .NET-projectbestanden, `requirements*.txt` (alleen `==`), `poetry.lock` en `uv.lock`. `yarn.lock` en `pnpm-lock.yaml` worden niet gelezen. Per repo zie je het aantal kwetsbaarheden per ernst, met link, getroffen package en de versie waarin het opgelost is. Met de kopieerknop zet je de versies en kwetsbaarheden van een repo als tekst op het klembord.
+
 ### PAT-scopes
 
 - Azure DevOps: **Code (Read)** (volstaat ook voor tags) en **Project and Team (Read)** (de projectenlijst komt van `/_apis/projects`)

@@ -15,7 +15,7 @@ De gebruiker wil in één oogopslag zien welke gevolgde repo's achterlopen op ta
 
 ## Niet-doelen
 
-- Losse packages/dependencies (niveau 3), CVE's (niveau 4, kan later via OSV.dev).
+- Losse packages/dependencies op "achter" checken (niveau 3).
 - Achtergrond-checks of meldingen.
 
 ## Wat de gebruiker besliste
@@ -86,3 +86,16 @@ Kleuren: Actueel groen, Achter oranje, EOL rood, Onbekend grijs.
 - "Nieuwste" = nieuwste uitgebrachte release, ook als die geen LTS is.
 - Repo's per account na elkaar; accounts parallel. Fout bij één repo stopt de rest niet.
 - Knop in het menu naast Geschiedenis.
+
+## Uitbreiding 2026-10-23: CVE-check en kopiëren
+
+Gebruiker vroeg: CVE-check via OSV.dev en een kopieerknop per repo.
+
+- Packages met exacte versie uit `go.mod` (requires, zonder `v`), `package-lock.json` (v1–3), `PackageReference`/`PackageVersion` (.csproj/.fsproj/Directory.*.props), `requirements*.txt` (alleen `==`), `poetry.lock`, `uv.lock`. Geen yarn/pnpm (Claude's call).
+- Eén `POST /v1/querybatch` voor alle unieke packages over alle repo's (per 1000), daarna `GET /v1/vulns/{id}` per unieke id (8 tegelijk) voor samenvatting, ernst (`database_specific.severity`), CVE-alias en fix-versies (GIT-ranges genegeerd).
+- Ids die elkaars alias zijn voor hetzelfde package: alleen de alfabetisch eerste (GHSA wint van GO, Claude's call).
+- Fix-versie: laagste "fixed" na de huidige versie.
+- OSV onbereikbaar: versies blijven, repo met packages toont "CVE-check mislukt".
+- Sorteren: een repo met kwetsbaarheden weegt als EOL, daarna meeste kwetsbaarheden (Claude's call). Stip rood.
+- UI: uitklapbare regel "N kwetsbaarheden (x critical, …)" met ernst-pill, CVE-link naar osv.dev, `package versie → fix`, samenvatting. Zoeken ook op package en CVE/OSV-id.
+- Kopieerknop per repo: repo, onderdelen met status, kwetsbaarheden met ernst, package, fix en link, als platte tekst.

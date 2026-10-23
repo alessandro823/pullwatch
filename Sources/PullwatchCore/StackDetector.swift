@@ -39,10 +39,14 @@ public enum StackDetector {
         "redis": "redis", "eclipse-temurin": "eclipse-temurin", "rust": "rust", "php": "php", "ruby": "ruby",
     ]
 
+    /// Pad ligt in een map die nooit gelezen wordt (node_modules, vendor, bin, …).
+    public static func isIgnored(_ path: String) -> Bool {
+        path.split(separator: "/").dropLast().contains { ignoredFolders.contains(String($0)) }
+    }
+
     public static func isRelevant(_ path: String) -> Bool {
-        let components = path.split(separator: "/")
-        guard let name = components.last.map(String.init) else { return false }
-        if components.dropLast().contains(where: { ignoredFolders.contains(String($0)) }) { return false }
+        guard let name = path.split(separator: "/").last.map(String.init) else { return false }
+        if isIgnored(path) { return false }
         return name == "go.mod" || name == "package.json" || name == ".nvmrc" || name == ".node-version"
             || name == "pyproject.toml" || name == ".python-version" || name == "Directory.Build.props"
             || name.hasSuffix(".csproj") || name.hasSuffix(".fsproj") || name.hasPrefix("Dockerfile")
