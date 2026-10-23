@@ -63,6 +63,7 @@ struct MenuView: View {
                     .disabled(model.history.unreadCount == 0)
                 Spacer()
                 HistoryButton()
+                OpenWindowButton(title: "Versies…", windowId: "versions")
                 SettingsButton()
                 Button("Stop") { NSApp.terminate(nil) }
             }

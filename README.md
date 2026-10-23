@@ -35,10 +35,14 @@ Bestaande PR's worden bij het toevoegen stil overgeslagen; alleen nieuwe PR's ge
 
 Aanroepen van `az` en `gh` time-outen na 20 seconden.
 
+### Versies
+
+Via **Versies…** in het menu check je welke gevolgde repo's (minstens één vinkje) achterlopen. Pullwatch leest per repo `go.mod`, `*.csproj`/`*.fsproj`/`Directory.Build.props`, `package.json` (Node, Angular, React, Vue, Next.js, Nuxt), `.nvmrc`, `pyproject.toml`, `.python-version` en `Dockerfile*` op de default branch, en vergelijkt de versies met [endoflife.date](https://endoflife.date). Status: **Actueel**, **Achter** (er is een nieuwere major/minor; patches tellen niet), **EOL** of **Onbekend**. De check draait alleen op knopdruk; het laatste resultaat blijft bewaard.
+
 ### PAT-scopes
 
 - Azure DevOps: **Code (Read)** (volstaat ook voor tags) en **Project and Team (Read)** (de projectenlijst komt van `/_apis/projects`)
-- GitHub (fine-grained): **Pull requests: Read** en **Metadata: Read** op de gewenste repos. Tags (`GET /repos/{owner}/{repo}/tags`) vereisen volgens de GitHub-documentatie alleen **Metadata: Read**, niet Contents (niet getest met een live PAT); classic: `repo`
+- GitHub (fine-grained): **Pull requests: Read** en **Metadata: Read** op de gewenste repos, plus **Contents: Read** voor Versies. Tags (`GET /repos/{owner}/{repo}/tags`) vereisen volgens de GitHub-documentatie alleen **Metadata: Read**, niet Contents (niet getest met een live PAT); classic: `repo`
 
 ## Bekende eigenaardigheden
 
@@ -48,6 +52,6 @@ Aanroepen van `az` en `gh` time-outen na 20 seconden.
 
 ## Data
 
-`~/Library/Application Support/Pullwatch/` — `config.json`, `seen.json`, `history.json` (geschiedenis van PR's en tags). Tokens staan in de Keychain (`nl.torrisi.pullwatch`).
+`~/Library/Application Support/Pullwatch/` — `config.json`, `seen.json`, `history.json` (geschiedenis van PR's en tags), `versions.json` (laatste versiecheck). Tokens staan in de Keychain (`nl.torrisi.pullwatch`).
 
 Logs: `log stream --predicate 'subsystem == "nl.torrisi.pullwatch"'`

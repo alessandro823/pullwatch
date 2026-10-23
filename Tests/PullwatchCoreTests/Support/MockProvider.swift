@@ -64,6 +64,8 @@ actor MockProvider: PRProvider {
         )
     }
 
+    func filePaths(in repo: String) async throws -> [String] { [] }
+    func fileContent(in repo: String, path: String) async throws -> String { "" }
     func invalidateCredentials() async { invalidateCount += 1 }
 }
 
@@ -95,5 +97,7 @@ actor GatedProvider: PRProvider {
 
     func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] { [] }
     func tags(in repos: [String]) async throws -> TagFetch { TagFetch(tags: []) }
+    func filePaths(in repo: String) async throws -> [String] { [] }
+    func fileContent(in repo: String, path: String) async throws -> String { "" }
     func invalidateCredentials() async {}
 }

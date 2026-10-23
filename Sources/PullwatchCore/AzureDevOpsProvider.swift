@@ -176,6 +176,34 @@ public actor AzureDevOpsProvider: PRProvider {
         return components.url!
     }
 
+    public func filePaths(in repo: String) async throws -> [String] {
+        let list: ValueList<ItemDTO>
+        do {
+            list = try await get(itemsURL(repo), query: [
+                URLQueryItem(name: "scopePath", value: "/"),
+                URLQueryItem(name: "recursionLevel", value: "Full"),
+            ])
+        } catch ProviderError.server(status: 404) {
+            return [] // lege repo
+        }
+        return list.value.filter { $0.isFolder != true }.map { String($0.path.drop { $0 == "/" }) }
+    }
+
+    public func fileContent(in repo: String, path: String) async throws -> String {
+        let item: ItemDTO = try await get(itemsURL(repo), query: [
+            URLQueryItem(name: "path", value: "/" + path),
+            URLQueryItem(name: "includeContent", value: "true"),
+        ])
+        return item.content ?? ""
+    }
+
+    /// `repo` is "project/naam", zoals `listRepos()` levert.
+    private func itemsURL(_ repo: String) -> URL {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        return baseURL.appending(path: parts.first ?? repo).appending(path: "_apis/git/repositories")
+            .appending(path: parts.last ?? repo).appending(path: "items")
+    }
+
     public func invalidateCredentials() async {
         projectCache = nil
         await tokenSource.invalidate()
@@ -249,6 +277,12 @@ public actor AzureDevOpsProvider: PRProvider {
 
 private struct ValueList<T: Decodable>: Decodable {
     let value: [T]
+}
+
+private struct ItemDTO: Decodable {
+    let path: String
+    let isFolder: Bool?
+    let content: String?
 }
 
 private struct ConnectionData: Decodable {

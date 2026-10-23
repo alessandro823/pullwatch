@@ -37,5 +37,10 @@ struct PullwatchApp: App {
             HistoryView(model: model)
         }
         .windowResizability(.contentMinSize)
+
+        Window("Versies", id: "versions") {
+            VersionsView(model: model)
+        }
+        .windowResizability(.contentMinSize)
     }
 }

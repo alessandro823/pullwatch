@@ -16,6 +16,10 @@ public protocol PRProvider: Sendable {
     /// Tags van de opgegeven repos; `Tag.repo` is exact de doorgegeven repo-string.
     /// Een repo die 404 of geen toegang geeft wordt overgeslagen en in `unavailableRepos` gemeld.
     func tags(in repos: [String]) async throws -> TagFetch
+    /// Alle bestandspaden (zonder leidende "/") op de default branch; een lege repo geeft een lege lijst.
+    func filePaths(in repo: String) async throws -> [String]
+    /// Inhoud van één bestand op de default branch als tekst.
+    func fileContent(in repo: String, path: String) async throws -> String
     /// Gooi gecachte tokens weg (na een 401).
     func invalidateCredentials() async
 }

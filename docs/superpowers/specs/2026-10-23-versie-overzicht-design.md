@@ -1,0 +1,88 @@
+# Pullwatch — versie-overzicht (welke repo's lopen achter)
+
+Datum: 2026-10-23
+Status: gebruiker gaf akkoord om zonder verdere vragen te bouwen
+
+## Waarom
+
+De gebruiker wil in één oogopslag zien welke gevolgde repo's achterlopen op taal- en frameworkversie.
+
+## Doelen
+
+- Knop **Versies…** in het menu opent een eigen venster (zoals Geschiedenis).
+- Check draait **alleen op knopdruk**; resultaat wordt bewaard en getoond met tijdstip.
+- Per repo: taal (niveau 1) en runtimes/frameworks (niveau 2), elk met status **Actueel / Achter / EOL** (of **Onbekend**).
+
+## Niet-doelen
+
+- Losse packages/dependencies (niveau 3), CVE's (niveau 4, kan later via OSV.dev).
+- Achtergrond-checks of meldingen.
+
+## Wat de gebruiker besliste
+
+- Niveau 1 + 2.
+- Alleen gevolgde repo's.
+- Alleen op knopdruk.
+- Indeling B: per repo gegroepeerd, onderdelen eronder, slechtste status bovenaan.
+- **Achter** alleen bij een nieuwere major/minor, niet bij een gemiste patch.
+
+## Ontwerp
+
+### Gevolgde repo's
+
+Per pollbaar account `listRepos()`, gefilterd op `account.watch(for:)` met minstens één vinkje (PR's, Tags of Completed). Zo tellen ook repo's mee die via de standaard voor nieuwe repo's gevolgd worden.
+
+### Bestanden lezen (provider)
+
+Twee nieuwe methodes op `PRProvider`:
+
+- `filePaths(in:)` — alle bestandspaden op de default branch, in één aanvraag.
+  GitHub `GET /repos/{repo}/git/trees/HEAD?recursive=1`; Azure DevOps `GET {project}/_apis/git/repositories/{repo}/items?scopePath=/&recursionLevel=Full`.
+  Lege repo (GitHub 409, Azure 404) → lege lijst.
+- `fileContent(in:path:)` — inhoud als tekst. GitHub `contents/{path}` met raw-Accept; Azure `items?path=…&includeContent=true`.
+
+### Herkenning
+
+Alleen bestanden buiten `node_modules`, `vendor`, `.git`, `bin`, `obj`, `dist`, `build`, max. 50 per repo:
+
+| Bestand | Onderdeel | Bron van de versie |
+|---|---|---|
+| `go.mod` | Go | `go 1.x` |
+| `*.csproj`, `*.fsproj`, `Directory.Build.props` | .NET | `TargetFramework(s)` `netX.Y` (geen netstandard/net4x) |
+| `package.json` | Node | `engines.node` |
+| `package.json` | Angular, React, Vue, Next.js, Nuxt | `@angular/core`, `react`, `vue`, `next`, `nuxt` in (dev)dependencies |
+| `.nvmrc`, `.node-version` | Node | eerste getal |
+| `pyproject.toml` | Python | `requires-python` |
+| `.python-version` | Python | inhoud |
+| `Dockerfile*` | Docker: image | `FROM image:tag` voor bekende images (node, golang, python, dotnet, alpine, debian, ubuntu, nginx, postgres, redis, eclipse-temurin, rust, php, ruby) |
+
+Versiespec → eerste `getal(.getal)*` (`^17.2.0` → `17.2.0`, `>=3.11` → `3.11`, `20-alpine` → `20`). Niet te lezen (variabelen, `lts/*`, `latest`) → overgeslagen.
+Komt een onderdeel meerdere keren voor in een repo, dan telt de **oudste** versie; de bronbestanden staan in de tooltip.
+
+### Laatste versie
+
+endoflife.date API v1 (`/api/v1/products/{product}`), één aanvraag per product per check (gecachet binnen de check).
+Releases met `releaseDate` in de toekomst tellen niet. De gevonden versie hoort bij de release met de langste naam waar de versie gelijk aan is of mee begint (`1.25.3` → `1.25`, `8.0` → `8`).
+
+- release `isEol` → **EOL**
+- release is niet de nieuwste uitgebrachte release → **Achter**
+- anders → **Actueel**
+- geen passende release of product onbereikbaar → **Onbekend**
+
+### Opslag
+
+`versions.json` in Application Support (`JSONFileStore<VersionReport>`).
+
+### UI (indeling B)
+
+Venster "Versies". Bovenin "Gecheckt {tijd}" en knop **Opnieuw checken** (tijdens check: voortgang "x/y repo's"). Lijst per repo, slechtste status eerst, dan alfabetisch: gekleurde stip + reponaam, daaronder per onderdeel `label versie → laatste` met pill. Repo zonder herkende onderdelen: "Niets herkend". Repo met fout: foutmelding in rood. Leeg (nooit gecheckt): uitleg + knop.
+
+Kleuren: Actueel groen, Achter oranje, EOL rood, Onbekend grijs.
+
+## Calls van Claude
+
+- Hele boom scannen in plaats van alleen root (anders mist .NET bijna altijd, csproj staat in submappen).
+- Oudste versie per onderdeel telt.
+- "Nieuwste" = nieuwste uitgebrachte release, ook als die geen LTS is.
+- Repo's per account na elkaar; accounts parallel. Fout bij één repo stopt de rest niet.
+- Knop in het menu naast Geschiedenis.

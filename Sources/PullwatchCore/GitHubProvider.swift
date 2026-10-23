@@ -148,6 +148,27 @@ public actor GitHubProvider: PRProvider {
         return URL(string: "https://github.com/\(repo)/releases/tag/\(encoded)")
     }
 
+    public func filePaths(in repo: String) async throws -> [String] {
+        let tree: TreeDTO
+        do {
+            tree = try await get(
+                apiBase.appending(path: "repos").appending(path: repo).appending(path: "git/trees/HEAD"),
+                query: [URLQueryItem(name: "recursive", value: "1")]
+            )
+        } catch ProviderError.server(status: 409) {
+            return [] // lege repo
+        }
+        return tree.tree.filter { $0.type == "blob" }.map(\.path)
+    }
+
+    public func fileContent(in repo: String, path: String) async throws -> String {
+        let data = try await data(
+            apiBase.appending(path: "repos").appending(path: repo).appending(path: "contents").appending(path: path),
+            accept: "application/vnd.github.raw+json"
+        )
+        return String(decoding: data, as: UTF8.self)
+    }
+
     public func invalidateCredentials() async {
         await tokenSource.invalidate()
     }
@@ -186,16 +207,20 @@ public actor GitHubProvider: PRProvider {
     }
 
     private func get<T: Decodable>(_ url: URL, query: [URLQueryItem] = []) async throws -> T {
+        try JSONDecoding.decode(T.self, from: try await data(url, query: query), snakeCase: true)
+    }
+
+    private func data(_ url: URL, query: [URLQueryItem] = [], accept: String = "application/vnd.github+json") async throws -> Data {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)
         let token = try await tokenSource.token()
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue(accept, forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         let (data, response) = try await http.send(request)
         try HTTPStatus.check(response, now: now())
-        return try JSONDecoding.decode(T.self, from: data, snakeCase: true)
+        return data
     }
 }
 
@@ -231,6 +256,15 @@ private struct SearchDTO: Decodable {
 
     let totalCount: Int
     let items: [Item]
+}
+
+private struct TreeDTO: Decodable {
+    struct Entry: Decodable {
+        let path: String
+        let type: String
+    }
+
+    let tree: [Entry]
 }
 
 private struct TagDTO: Decodable {

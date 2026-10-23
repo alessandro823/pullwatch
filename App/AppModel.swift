@@ -16,6 +16,9 @@ final class AppModel {
     private(set) var notificationsAllowed = true
     /// Voortgang van "Opnieuw ophalen"; `nil` als er niets loopt.
     private(set) var refetch: RefetchProgress?
+    private(set) var versionReport: VersionReport?
+    /// Voortgang van "Versies checken" (gescande repo's, totaal); `nil` als er niets loopt.
+    private(set) var versionCheck: (done: Int, total: Int)?
 
     struct RefetchProgress: Equatable {
         let startedAt: Date
@@ -26,6 +29,7 @@ final class AppModel {
     @ObservationIgnored private let configStore = JSONFileStore<AppConfig>(url: AppPaths.file("config.json"))
     @ObservationIgnored private let historyStore = JSONFileStore<History>(url: AppPaths.file("history.json"))
     @ObservationIgnored private let legacyRecentStore = JSONFileStore<RecentList>(url: AppPaths.file("recent.json"))
+    @ObservationIgnored private let versionStore = JSONFileStore<VersionReport>(url: AppPaths.file("versions.json"))
     @ObservationIgnored private let secrets = KeychainStore()
     @ObservationIgnored private let engine = PollEngine(
         makeProvider: { ProviderFactory.make($0) },
@@ -65,6 +69,12 @@ final class AppModel {
         var needsSave = initial.needsSave
         if history.prune(now: Date(), retention: config.historyRetention) { needsSave = true }
         if needsSave { saveHistory() }
+
+        do {
+            versionReport = try versionStore.load()
+        } catch {
+            logger.error("versions.json onleesbaar, start leeg: \(error.localizedDescription)")
+        }
     }
 
     /// Zet een onleesbaar bestand opzij als `<naam>.corrupt-<unix-tijd>`, zodat het niet overschreven wordt.
@@ -121,6 +131,23 @@ final class AppModel {
         refetch = RefetchProgress(startedAt: Date(), done: 0, total: total)
         await engine.resetHistorySync()
         await tick()
+    }
+
+    /// Leest per gevolgde repo de taal- en frameworkversies en vergelijkt ze met endoflife.date.
+    func checkVersions() async {
+        guard versionCheck == nil else { return }
+        versionCheck = (0, 0)
+        let checker = VersionChecker(makeProvider: { ProviderFactory.make($0) })
+        let report = await checker.run(accounts: config.pollableAccounts) { done, total in
+            await MainActor.run { [weak self] in self?.versionCheck = (done, total) }
+        }
+        versionReport = report
+        versionCheck = nil
+        do {
+            try versionStore.save(report)
+        } catch {
+            logger.error("versions opslaan mislukt: \(error.localizedDescription)")
+        }
     }
 
     private func updateRefetchProgress() async {
