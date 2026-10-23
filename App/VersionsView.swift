@@ -4,8 +4,41 @@ import SwiftUI
 struct VersionsView: View {
     let model: AppModel
 
+    private enum SortOrder: String {
+        case status, name
+    }
+
+    @State private var searchText = ""
+    @AppStorage("versionsSortOrder") private var sortOrder: SortOrder = .status
+
+    /// Zoekt op repo, onderdeel (bv. "Node") en versie; de report-volgorde is al slechtste status eerst.
+    private func repos(in report: VersionReport) -> [RepoVersions] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        let matching = query.isEmpty ? report.repos : report.repos.filter { repo in
+            repo.repo.localizedCaseInsensitiveContains(query)
+                || repo.components.contains {
+                    $0.label.localizedCaseInsensitiveContains(query) || $0.version.hasPrefix(query)
+                }
+        }
+        switch sortOrder {
+        case .status: return matching
+        case .name: return matching.sorted { $0.repo.localizedCaseInsensitiveCompare($1.repo) == .orderedAscending }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                TextField("Zoek op repo, taal of versie…", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                Picker("Sorteren", selection: $sortOrder) {
+                    Text("Status").tag(SortOrder.status)
+                    Text("Naam").tag(SortOrder.name)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
             HStack {
                 if let report = model.versionReport {
                     Text("Gecheckt \(report.checkedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -29,8 +62,13 @@ struct VersionsView: View {
             }
 
             if let report = model.versionReport {
-                List(report.repos) { repo in
-                    RepoVersionsRow(repo: repo)
+                let shown = repos(in: report)
+                if shown.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                } else {
+                    List(shown) { repo in
+                        RepoVersionsRow(repo: repo)
+                    }
                 }
             } else {
                 ContentUnavailableView(
