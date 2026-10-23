@@ -2,7 +2,7 @@ import Foundation
 
 /// Een package met exacte versie uit een lockfile of manifest, in OSV-termen.
 public struct Dependency: Codable, Hashable, Sendable {
-    /// OSV-ecosysteem: "Go", "npm", "NuGet" of "PyPI".
+    /// OSV-ecosysteem: "Go", "npm", "NuGet", "PyPI", "Packagist" of "crates.io".
     public let ecosystem: String
     public let name: String
     public let version: String
@@ -26,7 +26,7 @@ public struct Dependency: Codable, Hashable, Sendable {
 public enum DependencyDetector {
     public static func isRelevant(_ path: String) -> Bool {
         guard let name = path.split(separator: "/").last.map(String.init) else { return false }
-        return name == "go.mod" || name == "package-lock.json" || name == "poetry.lock" || name == "uv.lock"
+        return name == "go.mod" || name == "package-lock.json" || name == "composer.lock" || name == "Cargo.lock" || name == "poetry.lock" || name == "uv.lock"
             || name == "Directory.Packages.props" || name == "Directory.Build.props"
             || name.hasSuffix(".csproj") || name.hasSuffix(".fsproj")
             || (name.hasPrefix("requirements") && name.hasSuffix(".txt"))
@@ -36,7 +36,9 @@ public enum DependencyDetector {
         let name = path.split(separator: "/").last.map(String.init) ?? path
         if name == "go.mod" { return goModules(content, path: path) }
         if name == "package-lock.json" { return npmLock(content, path: path) }
-        if name == "poetry.lock" || name == "uv.lock" { return pythonLock(content, path: path) }
+        if name == "composer.lock" { return composerLock(content, path: path) }
+        if name == "poetry.lock" || name == "uv.lock" { return tomlLock(content, path: path, ecosystem: "PyPI") }
+        if name == "Cargo.lock" { return tomlLock(content, path: path, ecosystem: "crates.io", registryOnly: true) }
         if name.hasPrefix("requirements") { return requirements(content, path: path) }
         return nugetPackages(content, path: path)
     }
@@ -84,15 +86,38 @@ public enum DependencyDetector {
         return result.sorted { ($0.name, $0.version) < ($1.name, $1.version) }
     }
 
-    /// `[[package]]`-blokken met `name = "…"` en `version = "…"` (poetry.lock en uv.lock).
-    private static func pythonLock(_ content: String, path: String) -> [Dependency] {
+    /// `packages` en `packages-dev`; de "v" van tags valt weg, branches (`dev-main`) tellen niet.
+    private static func composerLock(_ content: String, path: String) -> [Dependency] {
+        struct Package: Decodable { let name: String; let version: String }
+        struct Lock: Decodable {
+            let packages: [Package]?
+            let packagesDev: [Package]?
+            enum CodingKeys: String, CodingKey { case packages, packagesDev = "packages-dev" }
+        }
+        guard let lock = try? JSONDecoder().decode(Lock.self, from: Data(content.utf8)) else { return [] }
+        return ((lock.packages ?? []) + (lock.packagesDev ?? [])).compactMap { package in
+            guard !package.version.hasPrefix("dev-") else { return nil }
+            let version = package.version.hasPrefix("v") ? String(package.version.dropFirst()) : package.version
+            guard StackDetector.version(from: version) != nil else { return nil }
+            return Dependency(ecosystem: "Packagist", name: package.name, version: version, source: path)
+        }
+    }
+
+    /// `[[package]]`-blokken met `name = "…"` en `version = "…"` (poetry.lock, uv.lock, Cargo.lock).
+    /// `registryOnly`: alleen packages met `source = "registry+…"`; workspace-crates en git-forks
+    /// staan niet op crates.io.
+    private static func tomlLock(_ content: String, path: String, ecosystem: String, registryOnly: Bool = false) -> [Dependency] {
         var result: [Dependency] = []
         var name: String?
         var version: String?
+        var fromRegistry = false
         func flush() {
-            if let name, let version { result.append(Dependency(ecosystem: "PyPI", name: name, version: version, source: path)) }
+            if let name, let version, !registryOnly || fromRegistry {
+                result.append(Dependency(ecosystem: ecosystem, name: name, version: version, source: path))
+            }
             name = nil
             version = nil
+            fromRegistry = false
         }
         for raw in content.split(whereSeparator: \.isNewline) {
             let line = raw.trimmingCharacters(in: .whitespaces)
@@ -100,6 +125,7 @@ public enum DependencyDetector {
                 flush()
                 continue
             }
+            if line.hasPrefix("source = \"registry+") { fromRegistry = true }
             if let m = line.wholeMatch(of: /(name|version)\s*=\s*"([^"]+)"/) {
                 if m.output.1 == "name" { name = name ?? String(m.output.2) } else { version = version ?? String(m.output.2) }
             }

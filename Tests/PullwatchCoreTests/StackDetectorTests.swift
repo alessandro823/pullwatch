@@ -65,8 +65,8 @@ import Testing
         FROM scratch
         """
         let found = StackDetector.detect(path: "Dockerfile", content: dockerfile)
-        #expect(found.map { "\($0.label)@\($0.version)" } == ["Docker node@20", "Docker dotnet@8.0"])
-        #expect(found.map(\.product) == ["nodejs", "dotnet"])
+        #expect(found.map { "\($0.label)@\($0.version)" } == ["Docker golang@1.22", "Docker node@20", "Docker dotnet@8.0"])
+        #expect(found.map(\.product) == ["go", "nodejs", "dotnet"])
     }
 
     @Test func extractsVersionFromSpec() {
@@ -132,5 +132,98 @@ import Testing
             EndOfLifeRelease(name: "1.27", releaseDate: "2026-08-19", isEol: false, latest: "1.27.3"),
             EndOfLifeRelease(name: "1.0", releaseDate: "2012-03-28", isEol: true, latest: nil),
         ])
+    }
+}
+
+@Suite struct PHPDetectionTests {
+    @Test func readsComposerJSON() {
+        let json = """
+        {"require":{"php":"^8.4","ext-json":"*","symfony/console":"^7.2","slim/slim":"^4.12"},
+         "require-dev":{"phpunit/phpunit":"^11.5"}}
+        """
+        #expect(StackDetector.isRelevant("composer.json"))
+        let found = StackDetector.detect(path: "composer.json", content: json)
+        #expect(found.map { "\($0.product)@\($0.version)" } == ["php@8.4", "symfony@7.2"])
+        #expect(found.map(\.label) == ["PHP", "Symfony"])
+    }
+
+    @Test func readsLaravel() {
+        let found = StackDetector.detect(path: "composer.json", content: #"{"require":{"laravel/framework":"^11.0"}}"#)
+        #expect(found.map { "\($0.product)@\($0.version)" } == ["laravel@11.0"])
+    }
+
+    @Test func recognisesCustomImageByKnownPrefix() {
+        let dockerfile = "FROM registry.example.com/docker/php-fpm-alpine-custom:8.4 AS base\nFROM base AS dev\n"
+        let found = StackDetector.detect(path: "Dockerfile", content: dockerfile)
+        #expect(found.map { "\($0.label)@\($0.product)@\($0.version)" } == ["Docker php@php@8.4"])
+    }
+}
+
+@Suite struct ComposerLockTests {
+    @Test func readsPackagesAndDevPackagesWithoutV() {
+        let lock = """
+        {"packages":[{"name":"guzzlehttp/psr7","version":"2.6.1"},{"name":"symfony/console","version":"v7.2.1"},
+                     {"name":"acme/x","version":"dev-main"}],
+         "packages-dev":[{"name":"phpunit/phpunit","version":"11.5.0"}]}
+        """
+        #expect(DependencyDetector.isRelevant("composer.lock"))
+        let found = DependencyDetector.detect(path: "composer.lock", content: lock)
+        #expect(found.map { "\($0.name)@\($0.version)" } == ["guzzlehttp/psr7@2.6.1", "symfony/console@7.2.1", "phpunit/phpunit@11.5.0"])
+        #expect(found.allSatisfy { $0.ecosystem == "Packagist" })
+    }
+}
+
+@Suite struct RustAndDockerArgTests {
+    @Test func readsRustToolchainAndCargoMinimum() {
+        #expect(StackDetector.isRelevant("rust-toolchain.toml"))
+        #expect(StackDetector.isRelevant("Cargo.toml"))
+        #expect(!StackDetector.isRelevant("crates/a/Cargo.toml"))
+        #expect(StackDetector.detect(path: "rust-toolchain.toml", content: "[toolchain]\nchannel = \"1.99.1\"\n").first?.version == "1.99.1")
+        #expect(StackDetector.detect(path: "rust-toolchain.toml", content: "[toolchain]\nchannel = \"stable\"\n").isEmpty)
+        #expect(StackDetector.detect(path: "rust-toolchain", content: "1.98.0\n").first?.version == "1.98.0")
+        let cargo = StackDetector.detect(path: "Cargo.toml", content: "[workspace.package]\nedition = \"2024\"\nrust-version = \"1.98\"\n")
+        #expect(cargo.map { "\($0.product)@\($0.version)" } == ["rust@1.98"])
+    }
+
+    @Test func dockerDigestAndArgDefaults() {
+        let dockerfile = """
+        ARG RUST_VERSION=1.99.1
+        ARG UNSET
+        FROM rust:${RUST_VERSION}-slim-trixie@sha256:00544ccc AS builder
+        FROM postgres:18.6@sha256:74935e72
+        FROM node:$UNSET
+        FROM gcr.io/distroless/cc-debian13:nonroot@sha256:83b9
+        """
+        let found = StackDetector.detect(path: "docker/Dockerfile", content: dockerfile)
+        #expect(found.map { "\($0.label)@\($0.version)" } == ["Docker rust@1.99.1", "Docker postgres@18.6"])
+    }
+}
+
+@Suite struct CargoLockTests {
+    @Test func readsRegistryPackagesOnly() {
+        let lock = """
+        version = 4
+
+        [[package]]
+        name = "rust-service"
+        version = "0.1.0"
+        dependencies = [
+         "serde",
+        ]
+
+        [[package]]
+        name = "serde"
+        version = "1.0.219"
+        source = "registry+https://github.com/rust-lang/crates.io-index"
+        checksum = "abc"
+
+        [[package]]
+        name = "forked"
+        version = "0.2.0"
+        source = "git+https://github.com/x/forked#abc"
+        """
+        #expect(DependencyDetector.isRelevant("fuzz/Cargo.lock"))
+        let found = DependencyDetector.detect(path: "Cargo.lock", content: lock)
+        #expect(found.map { "\($0.ecosystem):\($0.name)@\($0.version)" } == ["crates.io:serde@1.0.219"])
     }
 }

@@ -250,10 +250,14 @@ public struct VersionChecker: Sendable {
             .filter { StackDetector.isRelevant($0) || (DependencyDetector.isRelevant($0) && !StackDetector.isIgnored($0)) }
             .prefix(StackDetector.maxFiles)
         var scan = Scan()
+        var replacedGoModules: Set<String> = []
         for path in paths {
             // Eén onleesbaar bestand mag de rest van de repo niet blokkeren.
             guard let content = try? await provider.fileContent(in: repo, path: path) else { continue }
             scan.versions += StackDetector.detect(path: path, content: content)
+            if path.hasSuffix("go.mod") {
+                replacedGoModules.formUnion(StackDetector.localGoReplacements(path: path, content: content))
+            }
             if DependencyDetector.isRelevant(path) {
                 // Zelfde package uit twee bestanden telt één keer (eerste bron wint).
                 for dependency in DependencyDetector.detect(path: path, content: content)
@@ -261,6 +265,17 @@ public struct VersionChecker: Sendable {
                     scan.dependencies.append(dependency)
                 }
             }
+        }
+        scan.versions.removeAll { detected in
+            detected.product == "go" && replacedGoModules.contains(detected.source.split(separator: "/").dropLast().joined(separator: "/"))
+        }
+        // Een minimum (">=20") valt weg als dezelfde taal ergens vastgezet is (Docker, .nvmrc, toolchain).
+        let pinned = Set(scan.versions.filter { !$0.isMinimum }.map(\.product))
+        scan.versions.removeAll { $0.isMinimum && pinned.contains($0.product) }
+        scan.versions = scan.versions.map { detected in
+            guard let names = StackDetector.lockedPackages[detected.product],
+                  let locked = scan.dependencies.first(where: { names.contains($0.name) }) else { return detected }
+            return DetectedVersion(product: detected.product, label: detected.label, version: locked.version, source: locked.source)
         }
         return scan
     }

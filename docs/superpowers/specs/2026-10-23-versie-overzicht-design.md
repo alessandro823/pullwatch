@@ -109,3 +109,27 @@ Gebruiker koos: check vanzelf, melding bij nieuwe CVE's (vervangt "alleen op kno
 - Melding alleen voor CVE's (id + package) die er bij de vorige check voor die repo nog niet waren. Geen melding zonder vorige check, voor nieuw gevolgde repo's, of als de vorige CVE-check of scan van die repo mislukte (Claude's call: geen stortvloed).
 - Tot 3 losse meldingen (klik opent osv.dev), anders één samenvatting.
 - Automatische check waarbij elke repo een fout gaf: resultaat weggooien, opnieuw na 1 uur.
+
+## Uitbreiding 2026-10-23: PHP
+
+Aanleiding: `acme/php-api` (PHP) werd niet herkend.
+
+- `composer.json`: `require.php` → PHP; `laravel/framework` → Laravel; `symfony/framework-bundle`/`http-kernel`/`console` → Symfony.
+- `composer.lock` (`packages` + `packages-dev`, zonder `v`, geen `dev-*`) → OSV-ecosysteem Packagist.
+- Framework-versie uit de lockfile gaat voor het minimum uit het manifest (`^7.2` was 7.4.8 → anders vals EOL). Geldt ook voor npm-frameworks via `package-lock.json`.
+- Docker: onbekende imagenaam met bekende naam vóór het eerste "-" (bv. `php-fpm-alpine-custom`) telt als dat image (Claude's call; kan een enkele "Onbekend" opleveren bij bv. `node-exporter`).
+
+## Uitbreiding 2026-10-23: Rust en Dockerfile-fixes
+
+Aanleiding: `acme/rust-service` (Rust) werd niet herkend.
+
+- Rust uit `rust-toolchain`/`rust-toolchain.toml` (`channel`), anders `rust-version` uit de root-`Cargo.toml` (minimum; toolchain gaat voor).
+- `Cargo.lock`: alleen packages met `source = "registry+…"` → OSV-ecosysteem crates.io.
+- Dockerfile: `@sha256:…`-digest weghalen vóór het splitsen op ":" (miste `postgres:18.6@sha256:…`); `ARG NAAM=waarde` invullen in `FROM` (`rust:${RUST_VERSION}-slim`).
+
+## Correctie 2026-10-23: minimum vs. vastgezet
+
+Aanleiding: `acme/go-tool` toonde Go 1.21 (EOL) terwijl de module go 1.27.2 gebruikt, en Node 20 (`engines` `>=20`) terwijl Docker Node 24 draait.
+
+- `go.mod` in een map die een andere go.mod via `replace … => ./pad` aanwijst telt niet (gevendorde dependency; zijn `go`-regel is een minimum).
+- `DetectedVersion.isMinimum` voor `engines.node`, composer `php`, `requires-python`, `rust-version`. Valt weg als hetzelfde product in de repo ergens niet-minimum voorkomt (Docker, .nvmrc, toolchain, …). Vervangt de eerdere Rust-specifieke regel.

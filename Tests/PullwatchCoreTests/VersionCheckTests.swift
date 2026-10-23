@@ -200,3 +200,83 @@ private actor FileProvider: PRProvider {
         #expect(repo.vulnerabilityError == nil)
     }
 }
+
+@Suite struct LockedFrameworkVersionTests {
+    @Test func lockfileVersionWinsOverManifestMinimum() async {
+        let http = MockHTTPClient()
+        http.on("products/symfony", body: #"{"result":{"releases":[{"name":"7.4","releaseDate":"2025-11-01","isEol":false,"latest":{"name":"7.4.9"}},{"name":"7.2","releaseDate":"2024-11-01","isEol":true,"latest":{"name":"7.2.9"}}]}}"#)
+        http.on("querybatch", body: #"{"results":[{}]}"#)
+        let provider = FileProvider(repos: ["p/api"], files: ["p/api": [
+            "composer.json": #"{"require":{"symfony/console":"^7.2"}}"#,
+            "composer.lock": #"{"packages":[{"name":"symfony/console","version":"v7.4.8"}]}"#,
+        ]])
+        let account = Account(kind: .azureDevOps, displayName: "x", organization: "x", authMethod: .pat, repoWatch: ["p/api": .prs])
+
+        let report = await VersionChecker(makeProvider: { _ in provider }, http: http, now: { Date(timeIntervalSince1970: 1_792_000_000) })
+            .run(accounts: [account])
+
+        let symfony = report.repos.first?.components.first
+        #expect(symfony?.version == "7.4.8")
+        #expect(symfony?.status == .current)
+        #expect(symfony?.sources == ["composer.lock"])
+    }
+}
+
+@Suite struct RustPinnedVersionTests {
+    @Test func toolchainWinsOverCargoMinimum() async {
+        let http = MockHTTPClient()
+        http.on("products/rust", body: #"{"result":{"releases":[{"name":"1.99","releaseDate":"2026-09-01","isEol":false,"latest":{"name":"1.99.1"}}]}}"#)
+        let provider = FileProvider(repos: ["f/ehr"], files: ["f/ehr": [
+            "Cargo.toml": "[workspace.package]\nrust-version = \"1.98\"\n",
+            "rust-toolchain.toml": "[toolchain]\nchannel = \"1.99.1\"\n",
+        ]])
+        let account = Account(kind: .gitHub, displayName: "f", organization: "f", authMethod: .pat, repoWatch: ["f/ehr": .prs])
+
+        let report = await VersionChecker(makeProvider: { _ in provider }, http: http, now: { Date(timeIntervalSince1970: 1_792_000_000) })
+            .run(accounts: [account])
+
+        let rust = report.repos.first?.components.first
+        #expect(rust?.version == "1.99.1")
+        #expect(rust?.sources == ["rust-toolchain.toml"])
+    }
+}
+
+@Suite struct PinnedOverMinimumTests {
+    let now = Date(timeIntervalSince1970: 1_792_000_000)
+
+    func run(_ files: [String: String]) async -> [ComponentVersion] {
+        let provider = FileProvider(repos: ["t/go-tool"], files: ["t/go-tool": files])
+        let account = Account(kind: .azureDevOps, displayName: "t", organization: "t", authMethod: .pat, repoWatch: ["t/go-tool": .prs])
+        let report = await VersionChecker(makeProvider: { _ in provider }, http: MockHTTPClient(), now: { now }).run(accounts: [account])
+        return report.repos.first?.components ?? []
+    }
+
+    @Test func locallyReplacedGoModuleDoesNotCount() async {
+        let components = await run([
+            "backend/go.mod": "module app\n\ngo 1.27.2\n\nreplace github.com/x/bot => ./internal/bot\n",
+            "backend/internal/bot/go.mod": "module github.com/x/bot\n\ngo 1.21\n",
+            "tools/go.mod": "module tools\n\ngo 1.26\n",
+        ])
+        let go = components.first { $0.label == "Go" }
+        #expect(go?.version == "1.26")
+        #expect(go?.sources == ["backend/go.mod", "tools/go.mod"])
+    }
+
+    @Test func nodeEngineMinimumDropsWhenDockerPinsNode() async {
+        let components = await run([
+            "teams-app/package.json": #"{"engines":{"node":">=20.0.0"}}"#,
+            "docker/Dockerfile.frontend": "FROM node:24-alpine\n",
+        ])
+        #expect(components.map(\.label) == ["Docker node"])
+    }
+
+    @Test func minimumStaysWithoutPin() async {
+        let components = await run(["package.json": #"{"engines":{"node":">=20.0.0"}}"#])
+        #expect(components.map { "\($0.label)@\($0.version)" } == ["Node@20.0.0"])
+    }
+
+    @Test func resolvesRelativeReplacePaths() {
+        #expect(StackDetector.localGoReplacements(path: "backend/go.mod", content: "replace a => ./internal/a\nreplace (\n  b v1 => ../shared/b\n  c => github.com/c v1.0.0\n)\n")
+            == ["backend/internal/a", "shared/b"])
+    }
+}
