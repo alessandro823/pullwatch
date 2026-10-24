@@ -19,6 +19,8 @@ final class AppModel {
     private(set) var versionReport: VersionReport?
     /// Voortgang van "Versies checken" (gescande repo's, totaal); `nil` als er niets loopt.
     private(set) var versionCheck: (done: Int, total: Int)?
+    /// Repo's (`RepoVersions.id`) die nu los opnieuw gecheckt worden.
+    private(set) var refreshingRepos: Set<String> = []
 
     struct RefetchProgress: Equatable {
         let startedAt: Date
@@ -169,6 +171,22 @@ final class AppModel {
         }
         do {
             try versionStore.save(report)
+        } catch {
+            logger.error("versions opslaan mislukt: \(error.localizedDescription)")
+        }
+    }
+
+    /// Checkt één repo opnieuw en vervangt alleen die regel; geen meldingen.
+    func refreshVersions(of repo: RepoVersions) async {
+        guard versionCheck == nil, !refreshingRepos.contains(repo.id),
+              let account = config.accounts.first(where: { $0.id == repo.accountId }) else { return }
+        refreshingRepos.insert(repo.id)
+        let fresh = await VersionChecker(makeProvider: { ProviderFactory.make($0) }).run(account: account, repo: repo.repo)
+        refreshingRepos.remove(repo.id)
+        guard let report = versionReport else { return }
+        versionReport = report.replacing(fresh)
+        do {
+            try versionStore.save(versionReport!)
         } catch {
             logger.error("versions opslaan mislukt: \(error.localizedDescription)")
         }

@@ -91,6 +91,11 @@ public struct VersionReport: Codable, Equatable, Sendable {
 }
 
 extension VersionReport {
+    /// Vervangt één repo; `checkedAt` blijft het tijdstip van de laatste volledige check.
+    public func replacing(_ repo: RepoVersions) -> VersionReport {
+        VersionReport(checkedAt: checkedAt, repos: repos.map { $0.id == repo.id ? repo : $0 })
+    }
+
     /// Automatische check: eens per dag.
     public static let autoInterval: TimeInterval = 24 * 3600
     /// Na een volledig mislukte automatische check (bv. offline) opnieuw na een uur.
@@ -154,6 +159,21 @@ public struct VersionChecker: Sendable {
             }
         }
 
+        return VersionReport(checkedAt: now(), repos: results + (await check(targets, progress: progress)))
+    }
+
+    /// Checkt één repo opnieuw, bv. na een fix; het resultaat vervangt de regel in het rapport.
+    public func run(account: Account, repo: String) async -> RepoVersions {
+        let results = await check([(account, makeProvider(account), [repo])], progress: { _, _ in })
+        return results.first ?? RepoVersions(accountId: account.id, repo: repo, components: [])
+    }
+
+    /// Stap 2 t/m 5 voor de opgegeven repo's per account.
+    private func check(
+        _ targets: [(account: Account, provider: any PRProvider, repos: [String])],
+        progress: @escaping @Sendable (Int, Int) async -> Void
+    ) async -> [RepoVersions] {
+        var results: [RepoVersions] = []
         // 2. Bestanden scannen; accounts parallel, repo's per account na elkaar.
         let total = targets.reduce(0) { $0 + $1.repos.count }
         let counter = Counter()
@@ -237,7 +257,7 @@ public struct VersionChecker: Sendable {
                 ))
             }
         }
-        return VersionReport(checkedAt: date, repos: results)
+        return results
     }
 
     struct Scan: Sendable {

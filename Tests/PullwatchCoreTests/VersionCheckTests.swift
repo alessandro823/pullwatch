@@ -280,3 +280,26 @@ private actor FileProvider: PRProvider {
             == ["backend/internal/a", "shared/b"])
     }
 }
+
+@Suite struct SingleRepoRefreshTests {
+    let now = Date(timeIntervalSince1970: 1_792_000_000)
+
+    @Test func checksOneRepoAndReplacesItKeepingCheckedAt() async {
+        let http = MockHTTPClient()
+        http.on("products/go", body: #"{"result":{"releases":[{"name":"1.27","releaseDate":"2026-08-19","isEol":false,"latest":{"name":"1.27.3"}}]}}"#)
+        let provider = FileProvider(repos: nil, files: ["a/one": ["go.mod": "go 1.27.2"]])
+        let account = Account(kind: .gitHub, displayName: "a", organization: "a", authMethod: .pat, repoWatch: ["a/one": .prs])
+
+        let fresh = await VersionChecker(makeProvider: { _ in provider }, http: http, now: { now }).run(account: account, repo: "a/one")
+
+        #expect(fresh.components.first?.status == .current)
+        let old = VersionReport(checkedAt: Date(timeIntervalSince1970: 1), repos: [
+            RepoVersions(accountId: account.id, repo: "a/one", components: [], error: "Netwerkfout"),
+            RepoVersions(accountId: account.id, repo: "a/two", components: []),
+        ])
+        let updated = old.replacing(fresh)
+        #expect(updated.checkedAt == old.checkedAt)
+        #expect(updated.repos.first { $0.repo == "a/one" }?.error == nil)
+        #expect(updated.repos.count == 2)
+    }
+}

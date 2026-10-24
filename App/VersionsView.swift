@@ -77,7 +77,7 @@ struct VersionsView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(shown) { repo in
-                                RepoVersionsRow(repo: repo)
+                                RepoVersionsRow(model: model, repo: repo)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
                                 Divider()
@@ -101,6 +101,7 @@ struct VersionsView: View {
 }
 
 private struct RepoVersionsRow: View {
+    let model: AppModel
     let repo: RepoVersions
     @State private var copied = false
 
@@ -116,6 +117,21 @@ private struct RepoVersionsRow: View {
                     .frame(width: 8, height: 8)
                 Text(repo.repo).fontWeight(.semibold)
                 Spacer()
+                // Een accountfout staat onder de accountnaam (zonder "/"); daar valt niets los te checken.
+                if repo.repo.contains("/") {
+                    if model.refreshingRepos.contains(repo.id) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button {
+                            Task { await model.refreshVersions(of: repo) }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(model.versionCheck != nil)
+                        .help("Check deze repo opnieuw")
+                    }
+                }
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(repo.clipboardText, forType: .string)
