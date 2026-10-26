@@ -7,6 +7,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = Notifier.shared
         AppModel.shared.start()
+        DockIcon.shared.start()
+    }
+}
+
+/// Toont Pullwatch in het Dock zolang er een eigen venster (instellingen, geschiedenis, versies)
+/// open is; zonder venster draait de app weer alleen in de menubalk.
+@MainActor
+final class DockIcon {
+    static let shared = DockIcon()
+    static let windowIds = ["settings", "history", "versions"]
+
+    func start() {
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didMiniaturizeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { DockIcon.shared.update() }
+            }
+        }
+        // Bij willClose is het venster nog zichtbaar; daarom pas daarna kijken.
+        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { DockIcon.shared.update() } }
+        }
+    }
+
+    private func update() {
+        let hasWindow = NSApp.windows.contains { window in
+            (window.isVisible || window.isMiniaturized)
+                && Self.windowIds.contains { window.identifier?.rawValue.hasPrefix($0) == true }
+        }
+        let policy: NSApplication.ActivationPolicy = hasWindow ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        if hasWindow { NSApp.activate() }
     }
 }
 
