@@ -97,6 +97,11 @@ struct VersionsView: View {
         }
         .padding(12)
         .frame(minWidth: 520, minHeight: 420)
+        .onChange(of: model.versionsSearch, initial: true) { _, search in
+            guard let search else { return }
+            searchText = search
+            model.versionsSearch = nil
+        }
     }
 }
 

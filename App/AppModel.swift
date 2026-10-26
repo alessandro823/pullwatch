@@ -21,6 +21,8 @@ final class AppModel {
     private(set) var versionCheck: (done: Int, total: Int)?
     /// Repo's (`RepoVersions.id`) die nu los opnieuw gecheckt worden.
     private(set) var refreshingRepos: Set<String> = []
+    /// Zoekterm die het Versies-venster overneemt zodra het verschijnt (bv. een repo uit Geschiedenis).
+    var versionsSearch: String?
 
     struct RefetchProgress: Equatable {
         let startedAt: Date

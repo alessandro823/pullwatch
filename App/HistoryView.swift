@@ -1,3 +1,4 @@
+import AppKit
 import PullwatchCore
 import SwiftUI
 
@@ -20,9 +21,23 @@ struct HistoryView: View {
     @State private var filter: Filter = .all
     // Zonder selectie-binding vuurt de primaryAction (dubbelklik) van contextMenu niet.
     @State private var selection = Set<HistoryItem.ID>()
+    @Environment(\.openWindow) private var openWindow
 
     private var items: [HistoryItem] {
         model.history.search(searchText, kind: filter.kind)
+    }
+
+    /// Repo van de selectie, als die over één repo gaat.
+    private var selectedRepo: String? {
+        let repos = Set(model.history.items.filter { selection.contains($0.id) }.map(\.entry.repo))
+        return repos.count == 1 ? repos.first : nil
+    }
+
+    /// Opent het Versies-venster, gefilterd op `repo` als die er is.
+    private func showVersions(of repo: String?) {
+        model.versionsSearch = repo ?? ""
+        openWindow(id: "versions")
+        NSApp.activate()
     }
 
     var body: some View {
@@ -51,6 +66,12 @@ struct HistoryView: View {
                     }
                     .help("Haalt de PR's van alle accounts opnieuw op binnen de bewaartermijn, één account tegelijk (zonder meldingen)")
                 }
+                Button {
+                    showVersions(of: selectedRepo)
+                } label: {
+                    Label("Versies", systemImage: "shippingbox")
+                }
+                .help(selectedRepo.map { "Toon de versies van \($0)" } ?? "Open het versie-overzicht")
             }
 
             Table(items, selection: $selection) {
@@ -82,7 +103,11 @@ struct HistoryView: View {
                 }
                 .width(min: 90, ideal: 130)
             }
-            .contextMenu(forSelectionType: HistoryItem.ID.self) { _ in
+            .contextMenu(forSelectionType: HistoryItem.ID.self) { ids in
+                let repos = Set(model.history.items.filter { ids.contains($0.id) }.map(\.entry.repo))
+                if repos.count == 1, let repo = repos.first {
+                    Button("Toon versies van \(repo)") { showVersions(of: repo) }
+                }
             } primaryAction: { ids in
                 for id in ids {
                     if let item = model.history.items.first(where: { $0.id == id }) {
