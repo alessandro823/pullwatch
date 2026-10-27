@@ -92,6 +92,10 @@ The check runs once a day (can be turned off under Settings → General) and on 
 
 Logs: `log stream --predicate 'subsystem == "nl.torrisi.pullwatch"'`
 
+## Server
+
+A headless Go variant lives in [`server/`](server/). It polls the same GitHub and Azure DevOps sources, keeps history, runs the version and CVE check, and serves a small web dashboard from one binary. See [server/README.md](server/README.md) for configuration and how to run it (`go build`, `docker run`, or `docker compose`).
+
 ## License
 
 [Apache 2.0](LICENSE)

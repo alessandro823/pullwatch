@@ -1,0 +1,17 @@
+services:
+  pullwatch:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      AZURE_DEVOPS_TOKEN: ${AZURE_DEVOPS_TOKEN:-}
+      PULLWATCH_DASHBOARD_USER: ${PULLWATCH_DASHBOARD_USER:-}
+      PULLWATCH_DASHBOARD_PASSWORD: ${PULLWATCH_DASHBOARD_PASSWORD:-}
+    volumes:
+      - ./config.yaml:/config.yaml:ro
+      - pullwatch-data:/data
+    restart: unless-stopped
+
+volumes:
+  pullwatch-data:

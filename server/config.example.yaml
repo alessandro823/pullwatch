@@ -1,0 +1,36 @@
+# Copy to config.yaml and export the token environment variables.
+# Never put a token in this file. pullwatchd refuses a `token:` field.
+
+listen: ":8080"
+data_dir: data
+# Clamped to 1–15 minutes, same as the Mac app. Default 2m.
+poll_interval: 2m
+# two_months, six_months, one_year, forever
+history_retention: one_year
+auto_version_check: true
+
+accounts:
+  - name: work
+    provider: github          # github | azuredevops
+    organization: acme        # GitHub owner, or Azure DevOps organisation
+    token_env: GITHUB_TOKEN   # default GITHUB_TOKEN / AZURE_DEVOPS_TOKEN
+    include_drafts: false
+    hide_own: true
+    new_repo_default: prs     # none | prs. Tags are never on by default.
+    repos:
+      acme/api:
+        prs: true
+        tags: true
+        completed: true
+
+  - name: contoso
+    provider: azuredevops
+    organization: contoso
+    token_env: AZURE_DEVOPS_TOKEN
+    auth: pat                 # pat (HTTP basic) or bearer
+    new_repo_default: none
+    repos:
+      Proj/web:
+        prs: true
+        tags: false
+        completed: false
