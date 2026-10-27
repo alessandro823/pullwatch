@@ -60,12 +60,20 @@ public actor AzCLISource: TokenSource {
 public actor GhCLISource: TokenSource {
     private let runner: any ProcessRunner
     private let locator: CLILocator
+    /// Login van het `gh`-account; nil = het actieve account.
+    private let user: String?
     private let now: @Sendable () -> Date
     private var cached: (token: String, fetchedAt: Date)?
 
-    public init(runner: any ProcessRunner, locator: CLILocator = CLILocator(), now: @escaping @Sendable () -> Date = { Date() }) {
+    public init(
+        runner: any ProcessRunner,
+        locator: CLILocator = CLILocator(),
+        user: String? = nil,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.runner = runner
         self.locator = locator
+        self.user = user
         self.now = now
     }
 
@@ -74,7 +82,7 @@ public actor GhCLISource: TokenSource {
             return cached.token
         }
         guard let gh = locator.locate("gh") else { throw ProviderError.cliNotFound("gh") }
-        let output = try await runner.run(gh, ["auth", "token"])
+        let output = try await runner.run(gh, ["auth", "token"] + (user.map { ["--user", $0] } ?? []))
         let token = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         guard output.status == 0, !token.isEmpty else { throw ProviderError.cliNotLoggedIn("gh") }
         cached = (token, now())
@@ -83,5 +91,24 @@ public actor GhCLISource: TokenSource {
 
     public func invalidate() async {
         cached = nil
+    }
+}
+
+/// De accounts waarmee `gh` op github.com is ingelogd, het actieve eerst.
+public enum GhCLIAccounts {
+    public static func list(runner: any ProcessRunner, locator: CLILocator = CLILocator()) async -> [String] {
+        guard let gh = locator.locate("gh"),
+              let output = try? await runner.run(gh, ["auth", "status", "--json", "hosts"]) else { return [] }
+        return parse(output.stdout)
+    }
+
+    static func parse(_ json: String) -> [String] {
+        struct Status: Decodable {
+            struct Entry: Decodable { let login: String; let active: Bool? }
+            let hosts: [String: [Entry]]
+        }
+        guard let status = try? JSONDecoder().decode(Status.self, from: Data(json.utf8)) else { return [] }
+        let entries = status.hosts["github.com"] ?? []
+        return entries.filter { $0.active == true }.map(\.login) + entries.filter { $0.active != true }.map(\.login)
     }
 }

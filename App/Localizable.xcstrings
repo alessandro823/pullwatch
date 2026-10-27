@@ -450,6 +450,34 @@
         }
       }
     },
+    "Actief account in gh": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktives Konto in gh"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active account in gh"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compte actif dans gh"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actief account in gh"
+          }
+        }
+      }
+    },
     "Actueel": {
       "localizations": {
         "de": {
@@ -1426,6 +1454,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "GitHub CLI (gh auth login)"
+          }
+        }
+      }
+    },
+    "GitHub-account": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub-Konto"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub account"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compte GitHub"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub-account"
           }
         }
       }
@@ -3612,6 +3668,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Wanneer"
+          }
+        }
+      }
+    },
+    "Welk account uit `gh auth status` het token levert; handig als je met meerdere GitHub-accounts bent ingelogd": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welches Konto aus `gh auth status` das Token liefert; praktisch, wenn du mit mehreren GitHub-Konten angemeldet bist"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which account from `gh auth status` provides the token; useful when you are logged in with several GitHub accounts"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le compte de `gh auth status` qui fournit le jeton ; utile si vous êtes connecté avec plusieurs comptes GitHub"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welk account uit `gh auth status` het token levert; handig als je met meerdere GitHub-accounts bent ingelogd"
           }
         }
       }

@@ -15,6 +15,8 @@ struct AccountEditor: View {
     @State private var saveError: String?
     @State private var testTask: Task<Void, Never>?
     @State private var reposTask: Task<Void, Never>?
+    /// Accounts waarmee `gh` is ingelogd; leeg tot ze geladen zijn.
+    @State private var ghAccounts: [String] = []
 
     init(model: AppModel, original: Account) {
         self.model = model
@@ -29,6 +31,16 @@ struct AccountEditor: View {
                 Picker("Authenticatie", selection: $draft.authMethod) {
                     Text("Personal Access Token").tag(AuthMethod.pat)
                     Text(draft.kind == .azureDevOps ? "Azure CLI (az login)" : "GitHub CLI (gh auth login)").tag(AuthMethod.cli)
+                }
+                if draft.kind == .gitHub && draft.authMethod == .cli {
+                    Picker("GitHub-account", selection: $draft.cliUser) {
+                        Text("Actief account in gh").tag(String?.none)
+                        ForEach(ghAccountChoices, id: \.self) { login in
+                            Text(verbatim: login).tag(String?.some(login))
+                        }
+                    }
+                    .help("Welk account uit `gh auth status` het token levert; handig als je met meerdere GitHub-accounts bent ingelogd")
+                    .task { ghAccounts = await GhCLIAccounts.list(runner: SystemProcessRunner()) }
                 }
                 if draft.authMethod == .pat {
                     SecureField(
@@ -141,6 +153,12 @@ struct AccountEditor: View {
             testTask?.cancel()
             reposTask?.cancel()
         }
+    }
+
+    /// Ook een eerder gekozen account dat `gh` nu niet (meer) kent, zodat de keuze zichtbaar blijft.
+    private var ghAccountChoices: [String] {
+        guard let chosen = draft.cliUser, !ghAccounts.contains(chosen) else { return ghAccounts }
+        return ghAccounts + [chosen]
     }
 
     private var hasRequiredFields: Bool {

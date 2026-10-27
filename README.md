@@ -29,7 +29,7 @@ make release   # signed with Developer ID, notarized and stapled DMG
 ## Usage
 
 1. Click the menu bar icon → **Instellingen…** (Settings).
-2. Add an account (Azure DevOps or GitHub), choose PAT or CLI, and test the connection.
+2. Add an account (Azure DevOps or GitHub), choose PAT or CLI, and test the connection. With the GitHub CLI and several `gh` accounts, pick which one provides the token under **GitHub-account**.
 3. Per account, choose which repositories you follow: PR's, Tags and/or Completed (merged PRs).
 
 Tags are off by default. Next to each checkbox is a bell: turn it off to keep following the repository (menu and history) without getting notifications. The bell in the header toggles all visible repositories. Tags are polled every 15 minutes (separate from the PR interval; "Nu verversen" polls tags too). The first tag poll per repository is silent.

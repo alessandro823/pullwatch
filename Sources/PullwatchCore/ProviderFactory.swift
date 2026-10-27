@@ -20,7 +20,7 @@ public enum ProviderFactory {
         case .cli:
             switch account.kind {
             case .azureDevOps: tokens = AzCLISource(runner: runner)
-            case .gitHub: tokens = GhCLISource(runner: runner)
+            case .gitHub: tokens = GhCLISource(runner: runner, user: account.cliUser)
             }
         }
 

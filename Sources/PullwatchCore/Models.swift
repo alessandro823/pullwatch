@@ -122,6 +122,8 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     public var newRepoDefault: NewRepoDefault
     public var includeDrafts: Bool
     public var hideOwn: Bool
+    /// GitHub CLI: welk `gh`-account (login) het token levert; nil = het actieve account.
+    public var cliUser: String?
 
     public init(
         id: UUID = UUID(),
@@ -132,7 +134,8 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         repoWatch: [String: WatchSet] = [:],
         newRepoDefault: NewRepoDefault = .prs,
         includeDrafts: Bool = false,
-        hideOwn: Bool = true
+        hideOwn: Bool = true,
+        cliUser: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -143,10 +146,11 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.newRepoDefault = newRepoDefault
         self.includeDrafts = includeDrafts
         self.hideOwn = hideOwn
+        self.cliUser = cliUser
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, displayName, organization, authMethod, repoWatch, newRepoDefault, includeDrafts, hideOwn
+        case id, kind, displayName, organization, authMethod, repoWatch, newRepoDefault, includeDrafts, hideOwn, cliUser
     }
 
     public init(from decoder: any Decoder) throws {
@@ -159,6 +163,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         (repoWatch, newRepoDefault) = try RepoWatchCoding.decode(from: decoder)
         includeDrafts = try c.decode(Bool.self, forKey: .includeDrafts)
         hideOwn = try c.decode(Bool.self, forKey: .hideOwn)
+        cliUser = try c.decodeIfPresent(String.self, forKey: .cliUser)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -172,6 +177,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         try c.encode(newRepoDefault, forKey: .newRepoDefault)
         try c.encode(includeDrafts, forKey: .includeDrafts)
         try c.encode(hideOwn, forKey: .hideOwn)
+        try c.encodeIfPresent(cliUser, forKey: .cliUser)
     }
 
     /// Wat er voor deze repo gevolgd wordt (hoofdletterongevoelig).

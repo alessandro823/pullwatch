@@ -81,6 +81,19 @@ import Testing
         await #expect(throws: ProviderError.cliNotLoggedIn("gh")) { try await source.token() }
     }
 
+    @Test func ghAsksTokenForChosenUser() async throws {
+        let runner = MockProcessRunner()
+        runner.output = ProcessOutput(status: 0, stdout: "gho_x\n", stderr: "")
+        _ = try await GhCLISource(runner: runner, locator: homebrew, user: "second").token()
+        #expect(runner.calls.first?.1 == ["auth", "token", "--user", "second"])
+    }
+
+    @Test func listsGhAccountsActiveFirst() {
+        let json = #"{"hosts":{"github.com":[{"login":"work","active":false},{"login":"me","active":true}],"ghe.example.com":[{"login":"x","active":true}]}}"#
+        #expect(GhCLIAccounts.parse(json) == ["me", "work"])
+        #expect(GhCLIAccounts.parse("not json").isEmpty)
+    }
+
     @Test func staticTokenSource() async throws {
         #expect(try await StaticTokenSource(token: "x").token() == "x")
     }
