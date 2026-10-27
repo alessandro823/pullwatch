@@ -26,7 +26,7 @@ public enum StackDetector {
     /// Maximaal aantal bestanden dat per repo gelezen wordt.
     public static let maxFiles = 50
 
-    private static let ignoredFolders: Set<String> = ["node_modules", "vendor", ".git", "bin", "obj", "dist", "build"]
+    private static let ignoredFolders: Set<String> = ["node_modules", "vendor", ".git", "bin", "obj", "dist", "build", ".build"]
 
     private static let packageFrameworks: [(dependency: String, product: String, label: String)] = [
         ("@angular/core", "angular", "Angular"),
@@ -69,7 +69,8 @@ public enum StackDetector {
         if isIgnored(path) { return false }
         // Alleen de Cargo.toml in de root: daar staat bij een workspace de rust-version.
         if path == "Cargo.toml" { return true }
-        return name == "go.mod" || name == "package.json" || name == "composer.json"
+        if isWorkflow(path) { return true }
+        return name == "go.mod" || name == "package.json" || name == "composer.json" || name == "Package.swift"
             || name == "rust-toolchain" || name == "rust-toolchain.toml" || name == ".nvmrc" || name == ".node-version"
             || name == "pyproject.toml" || name == ".python-version" || name == "Directory.Build.props"
             || name.hasSuffix(".csproj") || name.hasSuffix(".fsproj") || name.hasPrefix("Dockerfile")
@@ -101,9 +102,17 @@ public enum StackDetector {
             return found("rust", "Rust", content).map { [$0] } ?? []
         case "rust-toolchain.toml":
             return tomlString("channel", in: content).flatMap { found("rust", "Rust", $0) }.map { [$0] } ?? []
+        case "Package.swift":
+            // `// swift-tools-version: 6.0` op de eerste regel: de minimaal benodigde Swift.
+            let line = content.split(whereSeparator: \.isNewline).first { $0.contains("swift-tools-version") }
+            return line.flatMap { $0.split(separator: ":", maxSplits: 1).last }
+                .flatMap { found("swift", "Swift", String($0)) }.map { [$0] } ?? []
         case "Cargo.toml":
             return tomlString("rust-version", in: content).flatMap { found("rust", "Rust", $0, isMinimum: true) }.map { [$0] } ?? []
         default:
+            if isWorkflow(path) {
+                return detectWorkflow(content, path: path)
+            }
             if name.hasSuffix(".csproj") || name.hasSuffix(".fsproj") || name == "Directory.Build.props" {
                 return dotnetVersions(in: content).map { DetectedVersion(product: "dotnet", label: ".NET", version: $0, source: path) }
             }
@@ -112,6 +121,48 @@ public enum StackDetector {
             }
             return []
         }
+    }
+
+    /// GitHub Actions-workflow (`.github/workflows/*.yml`).
+    static func isWorkflow(_ path: String) -> Bool {
+        path.hasPrefix(".github/workflows/") && (path.hasSuffix(".yml") || path.hasSuffix(".yaml"))
+    }
+
+    /// `python-version`, `node-version`, `go-version` en `dotnet-version` van de setup-acties,
+    /// ook als matrixlijst (`['3.9', '3.x']` of regels met `- "3.9"`). Wat CI test is een
+    /// ondergrens, geen vastgezette versie. Variabelen (`${{ … }}`) en Python `3.x` tellen niet.
+    private static func detectWorkflow(_ content: String, path: String) -> [DetectedVersion] {
+        let products = ["python": ("python", "Python"), "node": ("nodejs", "Node"), "go": ("go", "Go"), "dotnet": ("dotnet", ".NET")]
+        var result: [DetectedVersion] = []
+        func add(_ key: String, _ value: Substring) {
+            guard let (product, label) = products[key] else { return }
+            for item in value.split(whereSeparator: { ",[]".contains($0) }) {
+                var spec = item.trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: "'\"-")))
+                // "20.x" → 20, "8.0.x" → 8.0; "3.x" (Python 3) zegt niets.
+                if spec.hasSuffix(".x") || spec.hasSuffix(".*") { spec = String(spec.dropLast(2)) }
+                guard !spec.isEmpty, !spec.contains("$"), !(product == "python" && !spec.contains(".")),
+                      let version = version(from: spec), spec == version else { continue }
+                result.append(DetectedVersion(product: product, label: label, version: version, source: path, isMinimum: true))
+            }
+        }
+        let lines = content.split(whereSeparator: \.isNewline)
+        var listKey: String?
+        for raw in lines {
+            let line = raw.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first ?? ""
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if let key = listKey, trimmed.hasPrefix("-") {
+                add(key, Substring(trimmed.dropFirst()))
+                continue
+            }
+            listKey = nil
+            guard let m = trimmed.wholeMatch(of: /(python|node|go|dotnet)-version\s*:\s*(.*)/) else { continue }
+            if m.output.2.isEmpty {
+                listKey = String(m.output.1)
+            } else {
+                add(String(m.output.1), m.output.2)
+            }
+        }
+        return result
     }
 
     /// Eerste `getal(.getal)*` uit een versiespecificatie: "^17.2.0" → "17.2.0", "20-alpine" → "20".

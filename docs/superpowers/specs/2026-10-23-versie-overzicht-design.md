@@ -143,3 +143,11 @@ Gebruiker wil zien welke versie (release) de kwetsbaarheden heeft; koos voor het
 - `RepoVersions.release` (tag, onderdelen, kwetsbaarheden, fout). Tags ophalen mislukt → geen release; tag scannen mislukt → fout bij de release, main blijft staan.
 - Gebruiker: wat op main al opgelost is hoeft niet gemeld te worden. Status, sortering, lijst en meldingen gaan dus alleen over main; de release is info.
 - UI: tag naast de reponaam, afwijkende versie in de release achter het onderdeel, per kwetsbaarheid van main "ook in tag" of "alleen main".
+
+## Uitbreiding 2026-10-27: Swift en CI-workflows
+
+Aanleiding: `acme/swift-app` (Swift/Xcode) en `acme/python-scripts` (losse Python-scripts) toonden niets.
+
+- `Package.swift`: `swift-tools-version` → Swift. endoflife.date kent geen Swift → altijd Onbekend (Claude's call: liever zichtbaar dan weg).
+- `Package.resolved` v1–v3 → OSV-ecosysteem SwiftURL, naam als `github.com/owner/repo` (zonder schema en `.git`); pins zonder versie tellen niet. `.build` wordt overgeslagen.
+- `.github/workflows/*.yml`: `python-version`, `node-version`, `go-version`, `dotnet-version` (ook matrixlijsten) als minimum; `${{ … }}` en Python `3.x` tellen niet, `20.x`/`8.0.x` → 20/8.0.

@@ -2,7 +2,7 @@ import Foundation
 
 /// Een package met exacte versie uit een lockfile of manifest, in OSV-termen.
 public struct Dependency: Codable, Hashable, Sendable {
-    /// OSV-ecosysteem: "Go", "npm", "NuGet", "PyPI", "Packagist" of "crates.io".
+    /// OSV-ecosysteem: "Go", "npm", "NuGet", "PyPI", "Packagist", "crates.io" of "SwiftURL".
     public let ecosystem: String
     public let name: String
     public let version: String
@@ -26,7 +26,7 @@ public struct Dependency: Codable, Hashable, Sendable {
 public enum DependencyDetector {
     public static func isRelevant(_ path: String) -> Bool {
         guard let name = path.split(separator: "/").last.map(String.init) else { return false }
-        return name == "go.mod" || name == "package-lock.json" || name == "composer.lock" || name == "Cargo.lock" || name == "poetry.lock" || name == "uv.lock"
+        return name == "go.mod" || name == "package-lock.json" || name == "Package.resolved" || name == "composer.lock" || name == "Cargo.lock" || name == "poetry.lock" || name == "uv.lock"
             || name == "Directory.Packages.props" || name == "Directory.Build.props"
             || name.hasSuffix(".csproj") || name.hasSuffix(".fsproj")
             || (name.hasPrefix("requirements") && name.hasSuffix(".txt"))
@@ -37,6 +37,7 @@ public enum DependencyDetector {
         if name == "go.mod" { return goModules(content, path: path) }
         if name == "package-lock.json" { return npmLock(content, path: path) }
         if name == "composer.lock" { return composerLock(content, path: path) }
+        if name == "Package.resolved" { return swiftPackages(content, path: path) }
         if name == "poetry.lock" || name == "uv.lock" { return tomlLock(content, path: path, ecosystem: "PyPI") }
         if name == "Cargo.lock" { return tomlLock(content, path: path, ecosystem: "crates.io", registryOnly: true) }
         if name.hasPrefix("requirements") { return requirements(content, path: path) }
@@ -101,6 +102,38 @@ public enum DependencyDetector {
             guard StackDetector.version(from: version) != nil else { return nil }
             return Dependency(ecosystem: "Packagist", name: package.name, version: version, source: path)
         }
+    }
+
+    /// Package.resolved v1 (`object.pins`, `repositoryURL`) en v2/v3 (`pins`, `location`). OSV kent
+    /// Swift-packages als URL zonder schema en ".git": `github.com/apple/swift-nio`. Pins op een
+    /// branch of commit (geen `version`) tellen niet.
+    private static func swiftPackages(_ content: String, path: String) -> [Dependency] {
+        struct Pin: Decodable {
+            struct State: Decodable { let version: String? }
+            let location: String?
+            let repositoryURL: String?
+            let state: State
+        }
+        struct Resolved: Decodable {
+            struct Object: Decodable { let pins: [Pin] }
+            let pins: [Pin]?
+            let object: Object?
+        }
+        guard let resolved = try? JSONDecoder().decode(Resolved.self, from: Data(content.utf8)) else { return [] }
+        return (resolved.pins ?? resolved.object?.pins ?? []).compactMap { pin in
+            guard let url = pin.location ?? pin.repositoryURL, let version = pin.state.version else { return nil }
+            return Dependency(ecosystem: "SwiftURL", name: swiftPackageName(url), version: version, source: path)
+        }
+    }
+
+    /// "https://github.com/apple/swift-nio.git" en "git@github.com:apple/swift-nio.git" → "github.com/apple/swift-nio".
+    static func swiftPackageName(_ url: String) -> String {
+        var name = url
+        if let scheme = name.range(of: "://") { name = String(name[scheme.upperBound...]) }
+        if name.hasPrefix("git@") { name = String(name.dropFirst(4)).replacingOccurrences(of: ":", with: "/") }
+        if name.hasSuffix(".git") { name = String(name.dropLast(4)) }
+        if name.hasSuffix("/") { name = String(name.dropLast()) }
+        return name
     }
 
     /// `[[package]]`-blokken met `name = "…"` en `version = "…"` (poetry.lock, uv.lock, Cargo.lock).

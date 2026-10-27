@@ -227,3 +227,54 @@ import Testing
         #expect(found.map { "\($0.ecosystem):\($0.name)@\($0.version)" } == ["crates.io:serde@1.0.219"])
     }
 }
+
+@Suite struct SwiftAndWorkflowTests {
+    @Test func readsSwiftToolsVersion() {
+        let found = StackDetector.detect(path: "Kit/Package.swift", content: "// swift-tools-version: 6.4\n//\nimport PackageDescription\n")
+        #expect(found == [DetectedVersion(product: "swift", label: "Swift", version: "6.4", source: "Kit/Package.swift")])
+        #expect(StackDetector.isRelevant("Kit/Package.swift"))
+        #expect(!StackDetector.isRelevant("Kit/.build/checkouts/x/Package.swift"))
+    }
+
+    @Test func readsSwiftPackageResolvedV1AndV3() {
+        let v3 = #"{"pins":[{"identity":"swift-system","kind":"remoteSourceControl","location":"https://github.com/apple/swift-system","state":{"revision":"abc","version":"1.8.1"}},{"identity":"x","location":"git@github.com:a/x.git","state":{"branch":"main","revision":"def"}}],"version":3}"#
+        let v1 = #"{"object":{"pins":[{"package":"NIO","repositoryURL":"https://github.com/apple/swift-nio.git","state":{"version":"2.40.0"}}]},"version":1}"#
+        let deps = DependencyDetector.detect(path: "Package.resolved", content: v3) + DependencyDetector.detect(path: "Package.resolved", content: v1)
+        #expect(deps.map { "\($0.ecosystem):\($0.name)@\($0.version)" } == [
+            "SwiftURL:github.com/apple/swift-system@1.8.1",
+            "SwiftURL:github.com/apple/swift-nio@2.40.0",
+        ])
+        #expect(DependencyDetector.swiftPackageName("git@github.com:a/x.git") == "github.com/a/x")
+    }
+
+    @Test func readsSetupVersionsFromWorkflowsAsMinimum() {
+        let yaml = """
+        jobs:
+          test:
+            strategy:
+              matrix:
+                python-version: ['3.9', '3.x']
+                node:
+                  - 20
+            steps:
+              - uses: actions/setup-python@v5
+                with:
+                  python-version: ${{ matrix.python-version }}
+              - uses: actions/setup-go@v5
+                with:
+                  go-version: "1.26" # pinned
+              - uses: actions/setup-node@v4
+                with:
+                  node-version:
+                    - "22"
+              - uses: actions/setup-dotnet@v4
+                with:
+                  dotnet-version: 8.0.x
+        """
+        let found = StackDetector.detect(path: ".github/workflows/ci.yml", content: yaml)
+        #expect(found.map { "\($0.label) \($0.version)" } == ["Python 3.9", "Go 1.26", "Node 22", ".NET 8.0"])
+        #expect(found.allSatisfy { $0.isMinimum })
+        #expect(StackDetector.isRelevant(".github/workflows/ci.yaml"))
+        #expect(!StackDetector.isRelevant("docs/ci.yml"))
+    }
+}
