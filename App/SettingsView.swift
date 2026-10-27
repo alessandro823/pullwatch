@@ -116,6 +116,23 @@ private struct GeneralSettingsView: View {
                 set: { model.setAutoVersionCheck($0) }
             ))
             .help("Eens per dag automatisch; melding als er bij een gevolgde repo een nieuwe CVE bijkomt")
+            Toggle("Automatisch op updates controleren", isOn: Binding(
+                get: { model.config.checkForUpdates },
+                set: { model.setCheckForUpdates($0) }
+            ))
+            .help("Kijkt eens per dag op GitHub of er een nieuwere Pullwatch is")
+            HStack {
+                Text("Versie \(AppModel.currentVersion)").foregroundStyle(.secondary)
+                if let message = model.updateCheckMessage {
+                    Text(verbatim: "· \(message)").foregroundStyle(.secondary)
+                }
+                Spacer()
+                if model.isCheckingForUpdates {
+                    ProgressView().controlSize(.small)
+                }
+                Button("Nu controleren") { Task { await model.checkForUpdates(manual: true) } }
+                    .disabled(model.isCheckingForUpdates)
+            }
             Toggle("Starten bij inloggen", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, enabled in
                     do {

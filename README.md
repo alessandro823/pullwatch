@@ -34,6 +34,8 @@ make release   # signed with Developer ID, notarized and stapled DMG
 
 Tags are off by default. Next to each checkbox is a bell: turn it off to keep following the repository (menu and history) without getting notifications. The bell in the header toggles all visible repositories. Tags are polled every 15 minutes (separate from the PR interval; "Nu verversen" polls tags too). The first tag poll per repository is silent.
 
+Pullwatch checks GitHub once a day for a newer release (Settings → General, also **Check now**); when there is one, you get a notification and a download button in the menu.
+
 While a window (settings, history, versions) is open, Pullwatch shows in the Dock; close the last window and it runs from the menu bar only.
 
 ### History

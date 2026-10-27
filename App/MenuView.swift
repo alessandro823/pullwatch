@@ -27,6 +27,18 @@ struct MenuView: View {
                 .help("Nu verversen")
             }
 
+            if let update = model.availableUpdate {
+                HStack {
+                    Label("Pullwatch \(update.version) is beschikbaar", systemImage: "arrow.down.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
+                    Button("Release notes") { NSWorkspace.shared.open(update.pageURL) }
+                        .buttonStyle(.link)
+                    Button("Downloaden") { NSWorkspace.shared.open(update.downloadURL ?? update.pageURL) }
+                }
+                .font(.callout)
+            }
+
             if !model.notificationsAllowed {
                 Label("Meldingen staan uit in Systeeminstellingen", systemImage: "bell.slash")
                     .font(.caption)

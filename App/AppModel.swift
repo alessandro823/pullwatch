@@ -21,6 +21,11 @@ final class AppModel {
     private(set) var versionCheck: (done: Int, total: Int)?
     /// Repo's (`RepoVersions.id`) die nu los opnieuw gecheckt worden.
     private(set) var refreshingRepos: Set<String> = []
+    /// Nieuwere Pullwatch op GitHub; nil als deze versie de nieuwste is (of nog niet gekeken).
+    private(set) var availableUpdate: AvailableUpdate?
+    /// Uitkomst van "Nu controleren" onder Instellingen; nil als er niet handmatig gekeken is.
+    private(set) var updateCheckMessage: String?
+    private(set) var isCheckingForUpdates = false
     /// Zoekterm die het Versies-venster overneemt zodra het verschijnt (bv. een repo uit Geschiedenis).
     var versionsSearch: String?
 
@@ -43,6 +48,7 @@ final class AppModel {
     @ObservationIgnored private var loopTask: Task<Void, Never>?
     /// Vroegste moment voor de volgende automatische versiecheck (na een mislukte of lopende poging).
     @ObservationIgnored private var nextAutoVersionAttempt: Date?
+    @ObservationIgnored private var nextUpdateCheck: Date?
 
     private init() {
         do {
@@ -126,6 +132,7 @@ final class AppModel {
             while !Task.isCancelled {
                 await self.tick()
                 self.startAutoVersionCheckIfDue()
+                self.startUpdateCheckIfDue()
                 try? await Task.sleep(for: .seconds(15))
             }
         }
@@ -262,6 +269,50 @@ final class AppModel {
         config.pollInterval = seconds
         saveConfig()
         Task { await refreshNow() }
+    }
+
+    func setCheckForUpdates(_ enabled: Bool) {
+        config.checkForUpdates = enabled
+        saveConfig()
+    }
+
+    static var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    }
+
+    /// Bij het opstarten en daarna eens per dag; mislukt het (offline), dan over een uur opnieuw.
+    private func startUpdateCheckIfDue() {
+        guard config.checkForUpdates, !isCheckingForUpdates else { return }
+        if let nextUpdateCheck, Date() < nextUpdateCheck { return }
+        nextUpdateCheck = Date() + 3600
+        Task { await checkForUpdates(manual: false) }
+    }
+
+    /// Kijkt op GitHub naar een nieuwere release. Automatisch: één melding per nieuwe versie.
+    func checkForUpdates(manual: Bool) async {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
+        defer { isCheckingForUpdates = false }
+        do {
+            let update = try await UpdateChecker.check(current: Self.currentVersion, http: URLSessionHTTPClient())
+            availableUpdate = update
+            nextUpdateCheck = Date() + UpdateChecker.interval
+            if manual {
+                updateCheckMessage = update.map { String(localized: "Versie \($0.version) is beschikbaar") }
+                    ?? String(localized: "Je hebt de nieuwste versie (\(Self.currentVersion))")
+            }
+            let notifiedKey = "notifiedUpdateVersion"
+            if let update, !manual, UserDefaults.standard.string(forKey: notifiedKey) != update.version {
+                UserDefaults.standard.set(update.version, forKey: notifiedKey)
+                notifier.deliverUpdate(update)
+            }
+        } catch {
+            logger.notice("updatecheck mislukt: \(error.localizedDescription)")
+            if manual {
+                let reason = (error as? ProviderError)?.userMessage ?? error.localizedDescription
+                updateCheckMessage = String(localized: "Controleren mislukt: \(reason)")
+            }
+        }
     }
 
     func setAutoVersionCheck(_ enabled: Bool) {

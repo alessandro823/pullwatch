@@ -23,8 +23,8 @@ targets:
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [nl, en, de, fr]
         NSHumanReadableCopyright: "© 2026 Alessandro Torrisi"
-        CFBundleShortVersionString: "0.3.0"
-        CFBundleVersion: "4"
+        CFBundleShortVersionString: "0.3.1"
+        CFBundleVersion: "5"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.torrisi.pullwatch

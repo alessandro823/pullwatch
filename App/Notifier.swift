@@ -92,6 +92,15 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// Klik opent de DMG (of de releasepagina als die er niet bij staat).
+    func deliverUpdate(_ update: AvailableUpdate) {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Pullwatch \(update.version) is beschikbaar")
+        content.body = String(localized: "Klik om te downloaden.")
+        content.userInfo = ["url": (update.downloadURL ?? update.pageURL).absoluteString]
+        add(UNNotificationRequest(identifier: "update-\(update.version)", content: content, trigger: nil))
+    }
+
     func deliverAuthFailure(accountName: String) {
         let content = UNMutableNotificationContent()
         content.title = "Pullwatch: \(accountName)"
