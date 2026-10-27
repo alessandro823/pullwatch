@@ -68,9 +68,11 @@ docker run --rm -p 8080:8080 \
   pullwatchd
 ```
 
-The container listens on `:8080` and stores state in `/data`. Put the dashboard behind a login (`PULLWATCH_DASHBOARD_USER` / `PULLWATCH_DASHBOARD_PASSWORD`) before exposing it.
+The image is `golang:1.27.3-alpine3.24` for the build and `alpine:3.24.3` at runtime. It listens on `:8080` and stores state in `/data`. Put the dashboard behind a login (`PULLWATCH_DASHBOARD_USER` / `PULLWATCH_DASHBOARD_PASSWORD`) before exposing it.
 
 ## Tests
+
+The module is `go 1.27.3`.
 
 ```bash
 cd server
