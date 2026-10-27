@@ -64,6 +64,12 @@ public enum EndOfLife {
         return try decode(data)
     }
 
+    /// Releases voor `product`: endoflife.date, behalve voor producten die daar niet staan
+    /// maar een eigen releaselijst hebben (Swift).
+    public static func releases(product: String, http: any HTTPClient, now: Date = Date()) async throws -> [EndOfLifeRelease] {
+        product == "swift" ? try await SwiftReleases.fetch(http: http, now: now) : try await fetch(product: product, http: http, now: now)
+    }
+
     /// Patches tellen niet: alleen een nieuwere cyclus (major/minor) maakt een versie "achter".
     public static func evaluate(version: String, releases: [EndOfLifeRelease], now: Date) -> (status: VersionStatus, latest: String?) {
         let today = now.formatted(Date.ISO8601FormatStyle(timeZone: .gmt).year().month().day())
@@ -76,5 +82,37 @@ public enum EndOfLife {
         guard let match else { return (.unknown, latest) }
         if match.isEol { return (.eol, latest) }
         return (match.name == newest.name ? .current : .behind, latest)
+    }
+}
+
+/// Swift-releases van swift.org. Swift heeft geen EOL-beleid: een versie is actueel of achter, nooit EOL.
+public enum SwiftReleases {
+    public static let url = URL(string: "https://www.swift.org/api/v1/install/releases.json")!
+
+    /// Patches ("6.2.1") samengevoegd tot cycli ("6.2"): datum van de eerste, nieuwste patch als `latest`.
+    public static func decode(_ data: Data) throws -> [EndOfLifeRelease] {
+        struct Release: Decodable { let name: String; let date: String }
+        let releases = try JSONDecoding.decode([Release].self, from: data)
+        var cycles: [String: (date: String, latest: String)] = [:]
+        for release in releases {
+            let parts = release.name.split(separator: ".")
+            guard parts.count >= 2 else { continue }
+            let cycle = parts.prefix(2).joined(separator: ".")
+            if let current = cycles[cycle] {
+                cycles[cycle] = (
+                    min(current.date, release.date),
+                    VersionChecker.isOlder(current.latest, than: release.name) ? release.name : current.latest
+                )
+            } else {
+                cycles[cycle] = (release.date, release.name)
+            }
+        }
+        return cycles.map { EndOfLifeRelease(name: $0.key, releaseDate: $0.value.date, isEol: false, latest: $0.value.latest) }
+    }
+
+    public static func fetch(http: any HTTPClient, now: Date = Date()) async throws -> [EndOfLifeRelease] {
+        let (data, response) = try await http.send(URLRequest(url: url))
+        try HTTPStatus.check(response, now: now)
+        return try decode(data)
     }
 }

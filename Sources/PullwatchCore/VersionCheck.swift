@@ -236,7 +236,7 @@ public struct VersionChecker: Sendable {
         let products = Set(scans.flatMap { $0.versions.map(\.product) })
         let releases = await withTaskGroup(of: (String, [EndOfLifeRelease]?).self) { group in
             for product in products {
-                group.addTask { (product, try? await EndOfLife.fetch(product: product, http: http, now: now())) }
+                group.addTask { (product, try? await EndOfLife.releases(product: product, http: http, now: now())) }
             }
             return await group.reduce(into: [String: [EndOfLifeRelease]]()) { $0[$1.0] = $1.1 }
         }

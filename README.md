@@ -57,7 +57,7 @@ Calls to `az` and `gh` time out after 20 seconds.
 | `package.json` | Node (`engines`), Angular, React, Vue, Next.js, Nuxt |
 | `composer.json` | PHP, Symfony, Laravel |
 | `rust-toolchain(.toml)`, root `Cargo.toml` | Rust |
-| `Package.swift` | Swift (`swift-tools-version`; not on endoflife.date, so always unknown) |
+| `Package.swift` | Swift (`swift-tools-version`, compared with the releases on swift.org; Swift has no EOL policy, so never EOL) |
 | `.nvmrc`, `.node-version`, `pyproject.toml`, `.python-version` | Node, Python |
 | `Dockerfile*` | base images (node, golang, python, dotnet, alpine, debian, ubuntu, nginx, postgres, redis, eclipse-temurin, rust, php, ruby) |
 | `.github/workflows/*.yml` | `python-version`, `node-version`, `go-version`, `dotnet-version` |

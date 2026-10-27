@@ -278,3 +278,17 @@ import Testing
         #expect(!StackDetector.isRelevant("docs/ci.yml"))
     }
 }
+
+@Suite struct SwiftReleaseTests {
+    let now = Date(timeIntervalSince1970: 1_792_000_000) // oktober 2026
+
+    @Test func groupsPatchesIntoCyclesAndIsNeverEOL() throws {
+        let json = #"[{"name":"6.0","date":"2024-09-17"},{"name":"6.0.3","date":"2024-12-11"},{"name":"6.4.0","date":"2026-09-15"},{"name":"6.4.1","date":"2026-10-12"}]"#
+        let releases = try SwiftReleases.decode(Data(json.utf8))
+        let six = try #require(releases.first { $0.name == "6.4" })
+        #expect(six.latest == "6.4.1")
+        #expect(six.releaseDate == "2026-09-15")
+        #expect(EndOfLife.evaluate(version: "6.0", releases: releases, now: now) == (.behind, "6.4.1"))
+        #expect(EndOfLife.evaluate(version: "6.4", releases: releases, now: now).status == .current)
+    }
+}
