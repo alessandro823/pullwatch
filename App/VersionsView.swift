@@ -21,6 +21,7 @@ struct VersionsView: View {
                 || repo.components.contains {
                     $0.label.localizedCaseInsensitiveContains(query) || $0.version.hasPrefix(query)
                 }
+                || repo.release?.tag.localizedCaseInsensitiveContains(query) == true
                 || repo.vulnerabilities.contains {
                     $0.package.localizedCaseInsensitiveContains(query)
                         || $0.id.localizedCaseInsensitiveContains(query)
@@ -121,6 +122,12 @@ private struct RepoVersionsRow: View {
                     .fill(dotColor)
                     .frame(width: 8, height: 8)
                 Text(repo.repo).fontWeight(.semibold)
+                if let tag = repo.release?.tag {
+                    Label(tag, systemImage: "tag")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("Nieuwste tag; ook gecheckt, zodat je ziet wat er in de laatste release zit")
+                }
                 Spacer()
                 // Een accountfout staat onder de accountnaam (zonder "/"); daar valt niets los te checken.
                 if repo.repo.contains("/") {
@@ -158,14 +165,22 @@ private struct RepoVersionsRow: View {
                     Text("Niets herkend").foregroundStyle(.secondary)
                 } else {
                     ForEach(repo.components, id: \.label) { component in
-                        ComponentRow(component: component)
+                        ComponentRow(
+                            component: component,
+                            release: repo.release.map { release in
+                                (release.tag, release.components.first { $0.label == component.label })
+                            }
+                        )
                     }
+                }
+                if let release = repo.release, let error = release.error {
+                    Text("Tag \(release.tag) niet te checken: \(error)").foregroundStyle(.orange)
                 }
                 if let vulnerabilityError = repo.vulnerabilityError {
                     Text(vulnerabilityError).foregroundStyle(.orange)
                 }
                 if !repo.vulnerabilities.isEmpty {
-                    VulnerabilityList(vulnerabilities: repo.vulnerabilities)
+                    VulnerabilityList(repo: repo)
                 }
             }
             .font(.callout)
@@ -177,25 +192,36 @@ private struct RepoVersionsRow: View {
 
 private struct ComponentRow: View {
     let component: ComponentVersion
+    /// Nieuwste tag en hetzelfde onderdeel daarin; nil als de repo geen tags heeft.
+    let release: (tag: String, component: ComponentVersion?)?
 
     var body: some View {
         HStack(spacing: 6) {
             Text(component.label)
-            Text(versionText).monospacedDigit().foregroundStyle(.secondary)
+            Text(component.versionText).monospacedDigit().foregroundStyle(.secondary)
             VersionStatusPill(status: component.status)
+            // Ter info, zonder status: wat op main al bijgewerkt is telt niet.
+            if let release, let old = release.component, old.version != component.version {
+                Text("· \(release.tag): \(old.version)").monospacedDigit().foregroundStyle(.tertiary)
+            }
         }
         .help(component.sources.joined(separator: "\n"))
     }
+}
 
-    private var versionText: String {
-        guard let latest = component.latest, component.status != .current else { return component.version }
-        return "\(component.version) → \(latest)"
+extension ComponentVersion {
+    var versionText: String {
+        guard let latest, status != .current else { return version }
+        return "\(version) → \(latest)"
     }
 }
 
 private struct VulnerabilityList: View {
-    let vulnerabilities: [Vulnerability]
+    let repo: RepoVersions
     @State private var isExpanded = false
+
+
+    private var vulnerabilities: [Vulnerability] { repo.vulnerabilities }
 
     private var title: String {
         let count = vulnerabilities.count
@@ -204,7 +230,12 @@ private struct VulnerabilityList: View {
             return n > 0 ? "\(n) \(severity.lowercased())" : nil
         }
         let detail = bySeverity.isEmpty ? "" : " (\(bySeverity.joined(separator: ", ")))"
-        return "\(count) \(count == 1 ? "kwetsbaarheid" : "kwetsbaarheden")\(detail)"
+        var text = "\(count) \(count == 1 ? "kwetsbaarheid" : "kwetsbaarheden")\(detail)"
+        if let release = repo.release, release.error == nil {
+            let inRelease = vulnerabilities.filter { repo.isInRelease($0) == true }.count
+            text += " · \(inRelease) ook in \(release.tag)"
+        }
+        return text
     }
 
     var body: some View {
@@ -226,7 +257,7 @@ private struct VulnerabilityList: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(vulnerabilities.enumerated()), id: \.offset) { _, vulnerability in
-                        VulnerabilityRow(vulnerability: vulnerability)
+                        VulnerabilityRow(vulnerability: vulnerability, location: repo.location(of: vulnerability))
                     }
                 }
                 .padding(.leading, 16)
@@ -237,6 +268,7 @@ private struct VulnerabilityList: View {
 
 private struct VulnerabilityRow: View {
     let vulnerability: Vulnerability
+    let location: VulnerabilityLocation?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -244,6 +276,9 @@ private struct VulnerabilityRow: View {
                 SeverityPill(severity: vulnerability.severity)
                 Link(vulnerability.cve ?? vulnerability.id, destination: vulnerability.url)
                 Text(packageText).monospacedDigit().foregroundStyle(.secondary)
+                if let location {
+                    LocationPill(location: location)
+                }
             }
             if let summary = vulnerability.summary {
                 Text(summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
@@ -255,6 +290,55 @@ private struct VulnerabilityRow: View {
     private var packageText: String {
         let base = "\(vulnerability.package) \(vulnerability.version)"
         return vulnerability.fixedIn.map { "\(base) → \($0)" } ?? base
+    }
+}
+
+/// Of een kwetsbaarheid van main ook in de laatste release zit.
+enum VulnerabilityLocation {
+    case alsoInRelease(tag: String)
+    case mainOnly
+
+    var label: String {
+        switch self {
+        case .alsoInRelease(let tag): "ook in \(tag)"
+        case .mainOnly: "alleen main"
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .alsoInRelease(let tag): "Zit ook in de laatste release (\(tag))"
+        case .mainOnly: "Nieuw sinds de laatste release; nog niet uitgebracht"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .alsoInRelease: .red
+        case .mainOnly: .orange
+        }
+    }
+}
+
+private struct LocationPill: View {
+    let location: VulnerabilityLocation
+
+    var body: some View {
+        Text(location.label)
+            .font(.caption2)
+            .foregroundStyle(location.color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .overlay(Capsule().strokeBorder(location.color.opacity(0.5)))
+            .help(location.help)
+    }
+}
+
+extension RepoVersions {
+    /// nil als er geen release gecheckt is.
+    func location(of vulnerability: Vulnerability) -> VulnerabilityLocation? {
+        guard let release, let inRelease = isInRelease(vulnerability) else { return nil }
+        return inRelease ? .alsoInRelease(tag: release.tag) : .mainOnly
     }
 }
 
@@ -286,15 +370,21 @@ extension RepoVersions {
         var lines = [repo]
         if let error { lines.append("Fout: \(error)") }
         for component in components {
-            var line = "\(component.label) \(component.version)"
-            if let latest = component.latest, component.status != .current { line += " → \(latest)" }
-            lines.append("\(line) (\(component.status.label))")
+            lines.append("\(component.label) \(component.versionText) (\(component.status.label))")
+        }
+        if let release {
+            lines.append("Laatste tag \(release.tag):")
+            if let error = release.error { lines.append("Fout: \(error)") }
+            for component in release.components {
+                lines.append("  \(component.label) \(component.versionText) (\(component.status.label))")
+            }
         }
         if let vulnerabilityError { lines.append(vulnerabilityError) }
         if !vulnerabilities.isEmpty {
             lines.append("Kwetsbaarheden:")
             for v in vulnerabilities {
                 var line = "- \(v.cve ?? v.id)"
+                if let location = location(of: v) { line += " {\(location.label)}" }
                 if let severity = v.severity { line += " [\(severity)]" }
                 line += " \(v.package) \(v.version)"
                 if let fixedIn = v.fixedIn { line += " → \(fixedIn)" }

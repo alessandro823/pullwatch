@@ -133,3 +133,13 @@ Aanleiding: `acme/go-tool` toonde Go 1.21 (EOL) terwijl de module go 1.27.2 gebr
 
 - `go.mod` in een map die een andere go.mod via `replace … => ./pad` aanwijst telt niet (gevendorde dependency; zijn `go`-regel is een minimum).
 - `DetectedVersion.isMinimum` voor `engines.node`, composer `php`, `requires-python`, `rust-version`. Valt weg als hetzelfde product in de repo ergens niet-minimum voorkomt (Docker, .nvmrc, toolchain, …). Vervangt de eerdere Rust-specifieke regel.
+
+## Uitbreiding 2026-10-26: laatste tag
+
+Gebruiker wil zien welke versie (release) de kwetsbaarheden heeft; koos voor het checken van de laatste tag naast de default branch.
+
+- Nieuwste tag per repo via `tags(in:)`: hoogste versienummer uit de naam; pre-releases (`-`, alpha, beta, rc, pre, preview na het eerste cijfer) alleen als er niets anders is; gelijke versie → naam numeriek vergeleken; tags zonder cijfers tellen niet (Claude's call).
+- Zelfde scan op de tag: GitHub `git/trees/{tag}` en `contents/{pad}?ref={tag}`; Azure DevOps `versionDescriptor.version={tag}&versionDescriptor.versionType=tag`.
+- `RepoVersions.release` (tag, onderdelen, kwetsbaarheden, fout). Tags ophalen mislukt → geen release; tag scannen mislukt → fout bij de release, main blijft staan.
+- Gebruiker: wat op main al opgelost is hoeft niet gemeld te worden. Status, sortering, lijst en meldingen gaan dus alleen over main; de release is info.
+- UI: tag naast de reponaam, afwijkende versie in de release achter het onderdeel, per kwetsbaarheid van main "ook in tag" of "alleen main".

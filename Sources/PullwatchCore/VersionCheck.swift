@@ -20,6 +20,23 @@ public struct ComponentVersion: Codable, Hashable, Sendable {
     }
 }
 
+/// Dezelfde check op de nieuwste tag: wat er in de laatste release zit.
+public struct ReleaseVersions: Codable, Hashable, Sendable {
+    public let tag: String
+    public let components: [ComponentVersion]
+    /// Ernstigste eerst.
+    public let vulnerabilities: [Vulnerability]
+    /// Gezet als de tag niet te scannen was; de check van de default branch staat dan nog wel.
+    public let error: String?
+
+    public init(tag: String, components: [ComponentVersion], vulnerabilities: [Vulnerability] = [], error: String? = nil) {
+        self.tag = tag
+        self.components = components
+        self.vulnerabilities = vulnerabilities
+        self.error = error
+    }
+}
+
 public struct RepoVersions: Codable, Hashable, Sendable, Identifiable {
     public let accountId: UUID
     public let repo: String
@@ -29,10 +46,14 @@ public struct RepoVersions: Codable, Hashable, Sendable, Identifiable {
     public let vulnerabilities: [Vulnerability]
     /// Gezet als de CVE-check voor deze repo niet kon draaien (OSV onbereikbaar).
     public let vulnerabilityError: String?
+    /// Check van de nieuwste tag; nil als de repo geen tags met een versienummer heeft. Alleen ter info:
+    /// status, sortering en meldingen gaan over de default branch.
+    public let release: ReleaseVersions?
 
     public var id: String { "\(accountId.uuidString)/\(repo)" }
 
-    /// Slechtste status van de onderdelen; een fout telt als onbekend.
+    /// Slechtste status van de onderdelen; een fout telt als onbekend. Alleen de default branch telt:
+    /// wat daar al opgelost is, hoeft niet gemeld te worden.
     public var worstStatus: VersionStatus? {
         if error != nil { return .unknown }
         return components.map(\.status).max()
@@ -43,13 +64,20 @@ public struct RepoVersions: Codable, Hashable, Sendable, Identifiable {
         max(worstStatus?.severity ?? -1, vulnerabilities.isEmpty ? -1 : VersionStatus.eol.severity)
     }
 
+    /// Zit deze kwetsbaarheid van de default branch ook in de laatste release? nil zonder (bruikbare) release.
+    public func isInRelease(_ vulnerability: Vulnerability) -> Bool? {
+        guard let release, release.error == nil else { return nil }
+        return release.vulnerabilities.contains { $0.key == vulnerability.key }
+    }
+
     public init(
         accountId: UUID,
         repo: String,
         components: [ComponentVersion],
         error: String? = nil,
         vulnerabilities: [Vulnerability] = [],
-        vulnerabilityError: String? = nil
+        vulnerabilityError: String? = nil,
+        release: ReleaseVersions? = nil
     ) {
         self.accountId = accountId
         self.repo = repo
@@ -57,10 +85,11 @@ public struct RepoVersions: Codable, Hashable, Sendable, Identifiable {
         self.error = error
         self.vulnerabilities = vulnerabilities
         self.vulnerabilityError = vulnerabilityError
+        self.release = release
     }
 
     private enum CodingKeys: String, CodingKey {
-        case accountId, repo, components, error, vulnerabilities, vulnerabilityError
+        case accountId, repo, components, error, vulnerabilities, vulnerabilityError, release
     }
 
     /// versions.json van vóór de CVE-check heeft geen `vulnerabilities`.
@@ -72,6 +101,7 @@ public struct RepoVersions: Codable, Hashable, Sendable, Identifiable {
         error = try c.decodeIfPresent(String.self, forKey: .error)
         vulnerabilities = try c.decodeIfPresent([Vulnerability].self, forKey: .vulnerabilities) ?? []
         vulnerabilityError = try c.decodeIfPresent(String.self, forKey: .vulnerabilityError)
+        release = try c.decodeIfPresent(ReleaseVersions.self, forKey: .release)
     }
 }
 
@@ -115,8 +145,8 @@ extension VersionReport {
         var result: [(repo: String, vulnerability: Vulnerability)] = []
         for repo in repos {
             guard let old = before[repo.id], old.error == nil, old.vulnerabilityError == nil else { continue }
-            let known = Set(old.vulnerabilities.map { "\($0.id)|\($0.package)" })
-            for vulnerability in repo.vulnerabilities where !known.contains("\(vulnerability.id)|\(vulnerability.package)") {
+            let known = Set(old.vulnerabilities.map(\.key))
+            for vulnerability in repo.vulnerabilities where !known.contains(vulnerability.key) {
                 result.append((repo.repo, vulnerability))
             }
         }
@@ -178,14 +208,14 @@ public struct VersionChecker: Sendable {
         let total = targets.reduce(0) { $0 + $1.repos.count }
         let counter = Counter()
         await progress(0, total)
-        let scanned = await withTaskGroup(of: [(accountId: UUID, repo: String, found: Result<Scan, Error>)].self) { group in
+        let scanned = await withTaskGroup(of: [(accountId: UUID, repo: String, found: Result<RepoScan, Error>)].self) { group in
             for target in targets {
                 group.addTask {
-                    var out: [(accountId: UUID, repo: String, found: Result<Scan, Error>)] = []
+                    var out: [(accountId: UUID, repo: String, found: Result<RepoScan, Error>)] = []
                     for repo in target.repos {
-                        let found: Result<Scan, Error>
+                        let found: Result<RepoScan, Error>
                         do {
-                            found = .success(try await Self.scan(repo: repo, provider: target.provider))
+                            found = .success(try await Self.scanWithRelease(repo: repo, provider: target.provider))
                         } catch {
                             found = .failure(error)
                         }
@@ -199,7 +229,11 @@ public struct VersionChecker: Sendable {
         }
 
         // 3. Releases per product, één keer per check.
-        let products = Set(scanned.flatMap { (try? $0.found.get())?.versions.map(\.product) ?? [] })
+        let scans = scanned.flatMap { item -> [Scan] in
+            guard let repoScan = try? item.found.get() else { return [] }
+            return [repoScan.main] + ((try? repoScan.release?.found.get()).map { [$0] } ?? [])
+        }
+        let products = Set(scans.flatMap { $0.versions.map(\.product) })
         let releases = await withTaskGroup(of: (String, [EndOfLifeRelease]?).self) { group in
             for product in products {
                 group.addTask { (product, try? await EndOfLife.fetch(product: product, http: http, now: now())) }
@@ -208,7 +242,7 @@ public struct VersionChecker: Sendable {
         }
 
         // 4. Kwetsbaarheden: één batch voor alle unieke packages, daarna details per id.
-        let dependencies = Array(Set(scanned.flatMap { (try? $0.found.get())?.dependencies ?? [] }.map(\.withoutSource)))
+        let dependencies = Array(Set(scans.flatMap(\.dependencies).map(\.withoutSource)))
         var vulnerabilityIds: [Dependency: [String]] = [:]
         var osvError: String?
         var records: [String: OSVRecord] = [:]
@@ -224,36 +258,48 @@ public struct VersionChecker: Sendable {
 
         // 5. Per repo samenvoegen en beoordelen.
         let date = now()
+        func components(_ scan: Scan) -> [ComponentVersion] {
+            Self.combine(scan.versions).map { detected, sources in
+                let evaluation = releases[detected.product].flatMap { $0 }
+                    .map { EndOfLife.evaluate(version: detected.version, releases: $0, now: date) }
+                    ?? (status: .unknown, latest: nil)
+                return ComponentVersion(
+                    product: detected.product,
+                    label: detected.label,
+                    version: detected.version,
+                    latest: evaluation.latest,
+                    status: evaluation.status,
+                    sources: sources
+                )
+            }
+        }
+        func vulnerabilities(_ scan: Scan) -> [Vulnerability] {
+            OSV.vulnerabilities(
+                dependencies: scan.dependencies,
+                ids: scan.dependencies.map { vulnerabilityIds[$0.withoutSource] ?? [] },
+                records: records
+            )
+        }
         for item in scanned {
             switch item.found {
             case .failure(let error):
                 results.append(RepoVersions(accountId: item.accountId, repo: item.repo, components: [], error: Self.message(error)))
-            case .success(let scan):
-                let components = Self.combine(scan.versions).map { detected, sources in
-                    let evaluation = releases[detected.product].flatMap { $0 }
-                        .map { EndOfLife.evaluate(version: detected.version, releases: $0, now: date) }
-                        ?? (status: .unknown, latest: nil)
-                    return ComponentVersion(
-                        product: detected.product,
-                        label: detected.label,
-                        version: detected.version,
-                        latest: evaluation.latest,
-                        status: evaluation.status,
-                        sources: sources
-                    )
+            case .success(let repoScan):
+                let release = repoScan.release.map { tag, found in
+                    switch found {
+                    case .success(let scan):
+                        ReleaseVersions(tag: tag, components: components(scan), vulnerabilities: vulnerabilities(scan))
+                    case .failure(let error):
+                        ReleaseVersions(tag: tag, components: [], error: Self.message(error))
+                    }
                 }
-                let repoDependencies = scan.dependencies
-                let vulnerabilities = OSV.vulnerabilities(
-                    dependencies: repoDependencies,
-                    ids: repoDependencies.map { vulnerabilityIds[$0.withoutSource] ?? [] },
-                    records: records
-                )
                 results.append(RepoVersions(
                     accountId: item.accountId,
                     repo: item.repo,
-                    components: components,
-                    vulnerabilities: vulnerabilities,
-                    vulnerabilityError: repoDependencies.isEmpty ? nil : osvError
+                    components: components(repoScan.main),
+                    vulnerabilities: vulnerabilities(repoScan.main),
+                    vulnerabilityError: repoScan.main.dependencies.isEmpty ? nil : osvError,
+                    release: release
                 ))
             }
         }
@@ -265,15 +311,59 @@ public struct VersionChecker: Sendable {
         var dependencies: [Dependency] = []
     }
 
-    private static func scan(repo: String, provider: any PRProvider) async throws -> Scan {
-        let paths = try await provider.filePaths(in: repo)
+    /// Default branch plus, als de repo tags heeft, de nieuwste tag.
+    struct RepoScan: Sendable {
+        var main: Scan
+        var release: (tag: String, found: Result<Scan, Error>)?
+    }
+
+    private static func scanWithRelease(repo: String, provider: any PRProvider) async throws -> RepoScan {
+        var result = RepoScan(main: try await scan(repo: repo, ref: nil, provider: provider))
+        let tag: String?
+        do {
+            let fetch = try await provider.tags(in: [repo])
+            tag = latestTag(fetch.tags.filter { $0.repo == repo }.map(\.name))
+        } catch {
+            return result // zonder tags blijft het bij de default branch
+        }
+        if let tag {
+            do {
+                result.release = (tag, .success(try await scan(repo: repo, ref: tag, provider: provider)))
+            } catch {
+                result.release = (tag, .failure(error))
+            }
+        }
+        return result
+    }
+
+    /// Tag met het hoogste versienummer; pre-releases (`-rc1`, `beta`) alleen als er niets anders is.
+    /// Tags zonder cijfers tellen niet.
+    static func latestTag(_ names: [String]) -> String? {
+        let versioned = names.compactMap { name in StackDetector.version(from: name).map { (name: name, version: $0) } }
+        let isPrerelease = { (name: String) in
+            name.range(of: #"-|alpha|beta|rc|pre|preview"#, options: [.regularExpression, .caseInsensitive],
+                       range: name.firstIndex(where: \.isNumber).map { $0..<name.endIndex }) != nil
+        }
+        let finals = versioned.filter { !isPrerelease($0.name) }
+        let candidates = finals.isEmpty ? versioned : finals
+        return candidates.reduce(nil as (name: String, version: String)?) { best, item in
+            guard let best else { return item }
+            // Gelijke versie (rc1/rc2): de naam beslist, met getallen als getal.
+            let newer = isOlder(best.version, than: item.version)
+                || (!isOlder(item.version, than: best.version) && best.name.compare(item.name, options: .numeric) == .orderedAscending)
+            return newer ? item : best
+        }?.name
+    }
+
+    private static func scan(repo: String, ref: String?, provider: any PRProvider) async throws -> Scan {
+        let paths = try await provider.filePaths(in: repo, ref: ref)
             .filter { StackDetector.isRelevant($0) || (DependencyDetector.isRelevant($0) && !StackDetector.isIgnored($0)) }
             .prefix(StackDetector.maxFiles)
         var scan = Scan()
         var replacedGoModules: Set<String> = []
         for path in paths {
             // Eén onleesbaar bestand mag de rest van de repo niet blokkeren.
-            guard let content = try? await provider.fileContent(in: repo, path: path) else { continue }
+            guard let content = try? await provider.fileContent(in: repo, path: path, ref: ref) else { continue }
             scan.versions += StackDetector.detect(path: path, content: content)
             if path.hasSuffix("go.mod") {
                 replacedGoModules.formUnion(StackDetector.localGoReplacements(path: path, content: content))

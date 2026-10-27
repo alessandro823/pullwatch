@@ -31,6 +31,9 @@ public struct Vulnerability: Codable, Hashable, Sendable {
         self.source = source
     }
 
+    /// Zelfde lek in hetzelfde package, ongeacht de versie.
+    public var key: String { "\(id)|\(package)" }
+
     public var url: URL { URL(string: "https://osv.dev/vulnerability")!.appending(path: id) }
 
     /// Hoe erg: critical 4 … low 1, onbekend 0.

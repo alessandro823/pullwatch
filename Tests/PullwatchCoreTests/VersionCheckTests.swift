@@ -3,15 +3,18 @@ import Testing
 @testable import PullwatchCore
 
 /// Provider met vaste repo's en bestanden; `repos == nil` laat `listRepos` falen.
+/// Bestanden op een tag staan onder "repo@tag".
 private actor FileProvider: PRProvider {
     let repos: [String]?
     let files: [String: [String: String]]
     let brokenRepos: Set<String>
+    let tagNames: [String: [String]]
 
-    init(repos: [String]?, files: [String: [String: String]], brokenRepos: Set<String> = []) {
+    init(repos: [String]?, files: [String: [String: String]], brokenRepos: Set<String> = [], tags: [String: [String]] = [:]) {
         self.repos = repos
         self.files = files
         self.brokenRepos = brokenRepos
+        self.tagNames = tags
     }
 
     func currentUserId() async throws -> String { "me" }
@@ -22,12 +25,19 @@ private actor FileProvider: PRProvider {
     }
     func openPullRequests() async throws -> [PullRequest] { [] }
     func pullRequests(updatedSince since: Date?, limit: Int) async throws -> [PullRequest] { [] }
-    func tags(in repos: [String]) async throws -> TagFetch { TagFetch(tags: []) }
-    func filePaths(in repo: String) async throws -> [String] {
-        if brokenRepos.contains(repo) { throw ProviderError.server(status: 500) }
-        return (files[repo] ?? [:]).keys.sorted()
+    func tags(in repos: [String]) async throws -> TagFetch {
+        TagFetch(tags: repos.flatMap { repo in
+            (tagNames[repo] ?? []).map { Tag(accountId: UUID(), repo: repo, name: $0, authorName: nil, webURL: URL(string: "https://x")!) }
+        })
     }
-    func fileContent(in repo: String, path: String) async throws -> String { files[repo]?[path] ?? "" }
+    func filePaths(in repo: String, ref: String?) async throws -> [String] {
+        let key = ref.map { "\(repo)@\($0)" } ?? repo
+        if brokenRepos.contains(key) { throw ProviderError.server(status: 500) }
+        return (files[key] ?? [:]).keys.sorted()
+    }
+    func fileContent(in repo: String, path: String, ref: String?) async throws -> String {
+        files[ref.map { "\(repo)@\($0)" } ?? repo]?[path] ?? ""
+    }
     func invalidateCredentials() async {}
 }
 
@@ -149,6 +159,31 @@ private actor FileProvider: PRProvider {
         #expect(try await provider.fileContent(in: "Proj/web", path: "src/go.mod") == "go 1.26")
         let query = http.requests.last?.url?.query ?? ""
         #expect(query.contains("path=/src/go.mod"))
+        #expect(!query.contains("versionDescriptor"))
+    }
+
+    @Test func gitHubReadsTreeAndContentOnTag() async throws {
+        let http = MockHTTPClient()
+        http.on("git/trees/v1.2.0", body: #"{"tree":[{"path":"go.mod","type":"blob"}]}"#)
+        http.on("contents/go.mod", body: "go 1.26\n")
+        let provider = GitHubProvider(accountId: fixedAccountId, owner: "acme", tokenSource: StaticTokenSource(token: "t"), http: http)
+
+        #expect(try await provider.filePaths(in: "acme/web", ref: "v1.2.0") == ["go.mod"])
+        #expect(try await provider.fileContent(in: "acme/web", path: "go.mod", ref: "v1.2.0") == "go 1.26\n")
+        #expect(http.requests.last?.url?.query == "ref=v1.2.0")
+    }
+
+    @Test func azureReadsOnTag() async throws {
+        let http = MockHTTPClient()
+        http.on("includeContent=true", body: #"{"path":"/go.mod","content":"go 1.26"}"#)
+        let provider = AzureDevOpsProvider(
+            accountId: fixedAccountId, organization: "org", tokenSource: StaticTokenSource(token: "t"), authMethod: .pat, http: http
+        )
+
+        _ = try await provider.fileContent(in: "Proj/web", path: "go.mod", ref: "v1.2.0")
+        let query = http.requests.last?.url?.query ?? ""
+        #expect(query.contains("versionDescriptor.version=v1.2.0"))
+        #expect(query.contains("versionDescriptor.versionType=tag"))
     }
 }
 
@@ -301,5 +336,68 @@ private actor FileProvider: PRProvider {
         #expect(updated.checkedAt == old.checkedAt)
         #expect(updated.repos.first { $0.repo == "a/one" }?.error == nil)
         #expect(updated.repos.count == 2)
+    }
+}
+
+@Suite struct LatestReleaseTests {
+    let now = Date(timeIntervalSince1970: 1_792_000_000)
+
+    @Test func picksHighestFinalVersionTag() {
+        #expect(VersionChecker.latestTag(["v1.9.0", "v1.10.0", "v2.0.0-rc1", "nightly", "release-1.2"]) == "v1.10.0")
+        #expect(VersionChecker.latestTag(["v2.0.0-rc1", "v2.0.0-rc2"]) == "v2.0.0-rc2")
+        #expect(VersionChecker.latestTag(["nightly"]) == nil)
+        #expect(VersionChecker.latestTag([]) == nil)
+    }
+
+    @Test func fixedOnMainIsNotReported() async {
+        let http = MockHTTPClient()
+        http.on("products/go", body: #"{"result":{"releases":[{"name":"1.27","releaseDate":"2026-08-19","isEol":false,"latest":{"name":"1.27.3"}},{"name":"1.26","releaseDate":"2026-02-10","isEol":true,"latest":{"name":"1.26.10"}}]}}"#)
+        // Alleen de release heeft het (kwetsbare) pakket nog.
+        http.on("querybatch", body: #"{"results":[{"vulns":[{"id":"GO-1"}]}]}"#)
+        http.on("vulns/GO-1", body: #"{"id":"GO-1","affected":[{"package":{"name":"x.com/y","ecosystem":"Go"},"ranges":[{"events":[{"fixed":"1.1.0"}]}]}]}"#)
+        let provider = FileProvider(
+            repos: ["a/one"],
+            files: [
+                "a/one": ["go.mod": "go 1.27.2\n"],
+                "a/one@v1.0.0": ["go.mod": "go 1.26\nrequire x.com/y v1.0.0\n"],
+            ],
+            tags: ["a/one": ["v0.9.0", "v1.0.0"]]
+        )
+        let account = Account(kind: .gitHub, displayName: "a", organization: "a", authMethod: .pat, repoWatch: ["a/one": .prs])
+
+        let repo = await VersionChecker(makeProvider: { _ in provider }, http: http, now: { now }).run(account: account, repo: "a/one")
+
+        #expect(repo.components.first?.status == .current)
+        #expect(repo.release?.tag == "v1.0.0")
+        #expect(repo.release?.components.first?.version == "1.26")
+        #expect(repo.release?.components.first?.status == .eol)
+        #expect(repo.release?.vulnerabilities.first?.fixedIn == "1.1.0")
+        // Op main opgelost: telt niet mee.
+        #expect(repo.worstStatus == .current)
+        #expect(repo.vulnerabilities.isEmpty)
+        #expect(repo.severity == VersionStatus.current.severity)
+    }
+
+    @Test func noTagsMeansNoRelease() async {
+        let provider = FileProvider(repos: ["a/one"], files: ["a/one": [:]])
+        let account = Account(kind: .gitHub, displayName: "a", organization: "a", authMethod: .pat, repoWatch: ["a/one": .prs])
+
+        let repo = await VersionChecker(makeProvider: { _ in provider }, http: MockHTTPClient(), now: { now }).run(account: account, repo: "a/one")
+
+        #expect(repo.release == nil)
+    }
+
+    @Test func releaseOnlyVulnerabilityIsNotNotified() {
+        let id = UUID()
+        func vuln(_ v: String) -> Vulnerability {
+            Vulnerability(id: "GO-1", cve: nil, summary: nil, severity: nil, ecosystem: "Go", package: "x", version: v, fixedIn: nil, source: "go.mod")
+        }
+        let before = VersionReport(checkedAt: now, repos: [RepoVersions(accountId: id, repo: "a/one", components: [])])
+        let after = VersionReport(checkedAt: now, repos: [RepoVersions(
+            accountId: id, repo: "a/one", components: [],
+            release: ReleaseVersions(tag: "v1", components: [], vulnerabilities: [vuln("1.0.0")])
+        )])
+        #expect(after.newVulnerabilities(since: before).isEmpty)
+        #expect(after.repos[0].isInRelease(vuln("1.0.0")) == true)
     }
 }

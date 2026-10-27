@@ -41,6 +41,8 @@ Via **Versies…** in het menu check je welke gevolgde repo's (minstens één vi
 
 Dezelfde check zoekt bekende kwetsbaarheden (CVE's) via [OSV.dev](https://osv.dev) in packages met een exacte versie: `go.mod` (requires), `package-lock.json`, `PackageReference`/`PackageVersion` in .NET-projectbestanden, `requirements*.txt` (alleen `==`), `poetry.lock`, `uv.lock`, `composer.lock` en `Cargo.lock` (alleen crates.io). `yarn.lock` en `pnpm-lock.yaml` worden niet gelezen. Per repo zie je het aantal kwetsbaarheden per ernst, met link, getroffen package en de versie waarin het opgelost is. Met de kopieerknop zet je de versies en kwetsbaarheden van een repo als tekst op het klembord. Met ↻ naast de kopieerknop check je één repo opnieuw (bv. na een update), zonder de rest.
 
+Heeft een repo tags, dan wordt ook de nieuwste tag gecheckt (hoogste versienummer; pre-releases zoals `-rc1` alleen als er geen andere zijn). De tag staat naast de reponaam; wijkt een onderdeel in die release af van de default branch, dan zie je beide versies. Bij elke kwetsbaarheid staat of hij **ook in de tag** zit of **alleen op main** (nieuw sinds de release). Wat op main al opgelost is telt niet: geen melding, geen status, niet in de lijst. Via **Versies** in Geschiedenis (of rechtsklik op een regel) open je het overzicht gefilterd op die repo.
+
 ### PAT-scopes
 
 - Azure DevOps: **Code (Read)** (volstaat ook voor tags) en **Project and Team (Read)** (de projectenlijst komt van `/_apis/projects`)

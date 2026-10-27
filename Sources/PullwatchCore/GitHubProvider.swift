@@ -148,11 +148,11 @@ public actor GitHubProvider: PRProvider {
         return URL(string: "https://github.com/\(repo)/releases/tag/\(encoded)")
     }
 
-    public func filePaths(in repo: String) async throws -> [String] {
+    public func filePaths(in repo: String, ref: String?) async throws -> [String] {
         let tree: TreeDTO
         do {
             tree = try await get(
-                apiBase.appending(path: "repos").appending(path: repo).appending(path: "git/trees/HEAD"),
+                apiBase.appending(path: "repos").appending(path: repo).appending(path: "git/trees").appending(path: ref ?? "HEAD"),
                 query: [URLQueryItem(name: "recursive", value: "1")]
             )
         } catch ProviderError.server(status: 409) {
@@ -161,9 +161,10 @@ public actor GitHubProvider: PRProvider {
         return tree.tree.filter { $0.type == "blob" }.map(\.path)
     }
 
-    public func fileContent(in repo: String, path: String) async throws -> String {
+    public func fileContent(in repo: String, path: String, ref: String?) async throws -> String {
         let data = try await data(
             apiBase.appending(path: "repos").appending(path: repo).appending(path: "contents").appending(path: path),
+            query: ref.map { [URLQueryItem(name: "ref", value: $0)] } ?? [],
             accept: "application/vnd.github.raw+json"
         )
         return String(decoding: data, as: UTF8.self)
