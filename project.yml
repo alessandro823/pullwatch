@@ -19,8 +19,8 @@ targets:
       properties:
         LSUIElement: true
         CFBundleDisplayName: Pullwatch
-        CFBundleShortVersionString: "0.2.0"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "0.2.1"
+        CFBundleVersion: "3"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.torrisi.pullwatch

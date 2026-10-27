@@ -8,13 +8,7 @@ The app's interface is in Dutch.
 
 Download the latest `Pullwatch-x.y.z.dmg` from [Releases](https://github.com/alessandro823/pullwatch/releases), open it and drag Pullwatch to Applications.
 
-The app is ad-hoc signed, not notarized. On first launch macOS will refuse to open it; right-click the app → **Open**, or run:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/Pullwatch.app
-```
-
-Requires macOS 14 or later.
+The app is signed with a Developer ID and notarized by Apple. Universal (Apple silicon and Intel), requires macOS 14 or later.
 
 ## Build from source
 
@@ -26,8 +20,11 @@ Requires macOS 14 or later.
 make test      # PullwatchCore unit tests
 make install   # build and copy to ~/Applications/Pullwatch.app
 make run       # install + launch
-make dmg       # build dist/Pullwatch-<version>.dmg
+make dmg       # build dist/Pullwatch-<version>.dmg (ad-hoc signed)
+make release   # signed with Developer ID, notarized and stapled DMG
 ```
+
+`make release` needs a Developer ID Application certificate in the Keychain and a notarytool profile (`xcrun notarytool store-credentials pullwatch --apple-id <id> --team-id <team>`); override with `SIGN_ID=…` and `NOTARY_PROFILE=…`.
 
 ## Usage
 
@@ -83,7 +80,7 @@ The check runs once a day (can be turned off under Settings → General) and on 
 
 ## Known quirks
 
-- Because of ad-hoc signing, macOS may ask for Keychain access again after each `make install` for PAT accounts; choose "Always Allow".
+- With an ad-hoc signed local build (`make install`), macOS may ask for Keychain access again after each install for PAT accounts; choose "Always Allow".
 - On first launch Pullwatch asks for permission to send notifications.
 - `make run` doesn't restart a running Pullwatch; quit it first via **Stop** in the menu.
 
