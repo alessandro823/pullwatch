@@ -42,3 +42,28 @@ import Testing
             == [.summary(kind: .completed, count: 4, lines: ["p/r: T1", "p/r: T2", "p/r: T3"])])
     }
 }
+
+@Suite struct SilentRepoTests {
+    @Test func silencedKindsAreDroppedPerRepo() {
+        let account = Account(
+            id: fixedAccountId, kind: .gitHub, displayName: "a", organization: "p", authMethod: .pat,
+            repoWatch: [
+                "p/quiet": WatchSet(prs: true, tags: true, completed: true, notifyPRs: false, notifyCompleted: false),
+                "p/loud": .both,
+            ]
+        )
+        let prs = [PullRequest.fixture(repo: "p/quiet", number: 1), PullRequest.fixture(repo: "p/loud", number: 2)]
+        let tags = [Tag.fixture(repo: "p/quiet", name: "v1")]
+
+        let audible = NotificationPlanner.audible(pullRequests: prs, tags: tags, completed: prs, accounts: [account])
+
+        #expect(audible.pullRequests.map(\.repo) == ["p/loud"])
+        #expect(audible.tags.map(\.repo) == ["p/quiet"])
+        #expect(audible.completed.map(\.repo) == ["p/loud"])
+    }
+
+    @Test func oldWatchSetJSONNotifiesEverything() throws {
+        let watch = try JSONDecoder().decode(WatchSet.self, from: Data(#"{"prs":true,"tags":false}"#.utf8))
+        #expect(watch.notifyPRs && watch.notifyTags && watch.notifyCompleted)
+    }
+}

@@ -80,6 +80,7 @@ struct AccountEditor: View {
                                     .help("PR's aan/uit voor alle zichtbare repo's")
                                     .disabled(filteredRepos.isEmpty)
                                 Text("PR's").font(.caption).foregroundStyle(ItemKind.pullRequest.color)
+                                AllNotifyButton(sources: filteredRepos.map { binding(for: $0, \.notifyPRs) })
                             }
                             HStack(spacing: 4) {
                                 Toggle("Alle tags", sources: filteredRepos.map { binding(for: $0, \.tags) }, isOn: \.self)
@@ -87,6 +88,7 @@ struct AccountEditor: View {
                                     .help("Tags aan/uit voor alle zichtbare repo's")
                                     .disabled(filteredRepos.isEmpty)
                                 Text("Tags").font(.caption).foregroundStyle(ItemKind.tag.color)
+                                AllNotifyButton(sources: filteredRepos.map { binding(for: $0, \.notifyTags) })
                             }
                             HStack(spacing: 4) {
                                 Toggle("Alle completed", sources: filteredRepos.map { binding(for: $0, \.completed) }, isOn: \.self)
@@ -94,6 +96,7 @@ struct AccountEditor: View {
                                     .help("Completed aan/uit voor alle zichtbare repo's")
                                     .disabled(filteredRepos.isEmpty)
                                 Text("Completed").font(.caption).foregroundStyle(PRState.merged.color)
+                                AllNotifyButton(sources: filteredRepos.map { binding(for: $0, \.notifyCompleted) })
                             }
                             .help("Melding als een PR in deze repo gemerged wordt (binnen ~15 minuten)")
                         }
@@ -104,12 +107,9 @@ struct AccountEditor: View {
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                Toggle("PR's", isOn: binding(for: repo, \.prs))
-                                    .tint(ItemKind.pullRequest.color)
-                                Toggle("Tags", isOn: binding(for: repo, \.tags))
-                                    .tint(ItemKind.tag.color)
-                                Toggle("Completed", isOn: binding(for: repo, \.completed))
-                                    .tint(PRState.merged.color)
+                                watchCell(repo, \.prs, notify: \.notifyPRs, tint: ItemKind.pullRequest.color)
+                                watchCell(repo, \.tags, notify: \.notifyTags, tint: ItemKind.tag.color)
+                                watchCell(repo, \.completed, notify: \.notifyCompleted, tint: PRState.merged.color)
                             }
                         }
                     }
@@ -170,6 +170,21 @@ struct AccountEditor: View {
         return sorted.filter { $0.localizedCaseInsensitiveContains(repoSearch) }
     }
 
+    /// Vinkje voor volgen plus belletje voor de melding; het belletje doet pas iets als je volgt.
+    private func watchCell(
+        _ repo: String,
+        _ field: WritableKeyPath<WatchSet, Bool>,
+        notify: WritableKeyPath<WatchSet, Bool>,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 4) {
+            Toggle("Volgen", isOn: binding(for: repo, field))
+                .tint(tint)
+            NotifyButton(isOn: binding(for: repo, notify))
+                .disabled(!draft.watch(for: repo)[keyPath: field])
+        }
+    }
+
     private func binding(for repo: String, _ field: WritableKeyPath<WatchSet, Bool>) -> Binding<Bool> {
         Binding(
             get: { draft.watch(for: repo)[keyPath: field] },
@@ -219,5 +234,43 @@ struct AccountEditor: View {
             if Task.isCancelled { return }
             repoError = error.localizedDescription
         }
+    }
+}
+
+/// Belletje: wel of geen melding voor iets dat je volgt.
+private struct NotifyButton: View {
+    @Binding var isOn: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            Image(systemName: isOn ? "bell.fill" : "bell.slash")
+                .foregroundStyle(isOn && isEnabled ? Color.primary : Color.secondary)
+                .opacity(isEnabled ? 1 : 0.3)
+        }
+        .buttonStyle(.borderless)
+        .help(isOn ? "Melding aan; klik om alleen te volgen zonder melding" : "Geen melding; staat wel in menu en geschiedenis")
+    }
+}
+
+/// Belletje in de kop: alles aan, of alles uit als alles al aan staat.
+private struct AllNotifyButton: View {
+    let sources: [Binding<Bool>]
+
+    private var allOn: Bool { sources.allSatisfy(\.wrappedValue) }
+
+    var body: some View {
+        Button {
+            let target = !allOn
+            for source in sources { source.wrappedValue = target }
+        } label: {
+            Image(systemName: allOn ? "bell.fill" : "bell.slash")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .disabled(sources.isEmpty)
+        .help(allOn ? "Meldingen uit voor alle zichtbare repo's" : "Meldingen aan voor alle zichtbare repo's")
     }
 }

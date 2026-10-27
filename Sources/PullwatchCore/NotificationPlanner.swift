@@ -21,6 +21,21 @@ public enum NotificationPlanner {
             + planKind(completed, kind: .completed, single: { .completed($0) }, line: { "\($0.repo): \($0.title)" })
     }
 
+    /// Laat weg waarvoor de repo op "geen melding" staat; het item zelf blijft gevolgd.
+    public static func audible(
+        pullRequests: [PullRequest], tags: [Tag], completed: [PullRequest], accounts: [Account]
+    ) -> (pullRequests: [PullRequest], tags: [Tag], completed: [PullRequest]) {
+        let byId = Dictionary(accounts.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        func notifies(_ accountId: UUID, _ repo: String, _ field: KeyPath<WatchSet, Bool>) -> Bool {
+            byId[accountId]?.watch(for: repo)[keyPath: field] ?? true
+        }
+        return (
+            pullRequests.filter { notifies($0.accountId, $0.repo, \.notifyPRs) },
+            tags.filter { notifies($0.accountId, $0.repo, \.notifyTags) },
+            completed.filter { notifies($0.accountId, $0.repo, \.notifyCompleted) }
+        )
+    }
+
     private static func planKind<T>(
         _ items: [T],
         kind: NotificationKind,

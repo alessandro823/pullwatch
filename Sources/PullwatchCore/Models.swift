@@ -23,23 +23,36 @@ public struct WatchSet: Codable, Hashable, Sendable {
     public var tags: Bool
     /// Melding als een PR in deze repo gemerged (completed) wordt.
     public var completed: Bool
+    /// Melding bij een nieuwe PR; uit = wel volgen (menu, geschiedenis), geen melding.
+    public var notifyPRs: Bool
+    public var notifyTags: Bool
+    public var notifyCompleted: Bool
 
-    public init(prs: Bool, tags: Bool, completed: Bool = false) {
+    public init(
+        prs: Bool, tags: Bool, completed: Bool = false,
+        notifyPRs: Bool = true, notifyTags: Bool = true, notifyCompleted: Bool = true
+    ) {
         self.prs = prs
         self.tags = tags
         self.completed = completed
+        self.notifyPRs = notifyPRs
+        self.notifyTags = notifyTags
+        self.notifyCompleted = notifyCompleted
     }
 
     private enum CodingKeys: String, CodingKey {
-        case prs, tags, completed
+        case prs, tags, completed, notifyPRs, notifyTags, notifyCompleted
     }
 
-    /// Oude JSON heeft geen `completed`: dan staat het uit.
+    /// Oude JSON heeft geen `completed` (dan uit) en geen meldingskeuzes (dan aan).
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         prs = try c.decode(Bool.self, forKey: .prs)
         tags = try c.decode(Bool.self, forKey: .tags)
         completed = try c.decodeIfPresent(Bool.self, forKey: .completed) ?? false
+        notifyPRs = try c.decodeIfPresent(Bool.self, forKey: .notifyPRs) ?? true
+        notifyTags = try c.decodeIfPresent(Bool.self, forKey: .notifyTags) ?? true
+        notifyCompleted = try c.decodeIfPresent(Bool.self, forKey: .notifyCompleted) ?? true
     }
 
     public static let none = WatchSet(prs: false, tags: false)

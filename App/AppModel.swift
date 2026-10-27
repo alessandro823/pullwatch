@@ -297,11 +297,17 @@ final class AppModel {
         if history.merge(synced: result.syncedPullRequests, notBefore: cutoff) { changed = true }
         if history.prune(now: now, retention: config.historyRetention) { changed = true }
         if changed { saveHistory() }
-        if hasNotified || !result.completedPullRequests.isEmpty {
+        let audible = NotificationPlanner.audible(
+            pullRequests: result.newPullRequests,
+            tags: result.newTags,
+            completed: result.completedPullRequests,
+            accounts: config.accounts
+        )
+        if !audible.pullRequests.isEmpty || !audible.tags.isEmpty || !audible.completed.isEmpty {
             notifier.deliver(NotificationPlanner.plan(
-                pullRequests: result.newPullRequests,
-                tags: result.newTags,
-                completed: result.completedPullRequests
+                pullRequests: audible.pullRequests,
+                tags: audible.tags,
+                completed: audible.completed
             ))
         }
         for id in result.authFailures {

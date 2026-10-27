@@ -23,7 +23,7 @@ make run       # install + starten
 2. Voeg een account toe (Azure DevOps of GitHub), kies PAT of CLI, test de verbinding.
 3. Kies per account welke repos je volgt (alles behalve / alleen geselecteerde).
 
-Tags volg je door per repo het vinkje voor tags aan te zetten; ze staan standaard overal uit. Tags worden elke 15 minuten gepolld (los van het PR-interval; "Nu verversen" pollt ook tags). De eerste tag-poll per repo is stil.
+Tags volg je door per repo het vinkje voor tags aan te zetten; ze staan standaard overal uit. Naast elk vinkje (PR's, Tags, Completed) staat een belletje: zet je dat uit, dan volg je de repo nog wel (menu en geschiedenis), maar krijg je er geen melding van. Het belletje in de kop zet het voor alle zichtbare repo's aan of uit. Tags worden elke 15 minuten gepolld (los van het PR-interval; "Nu verversen" pollt ook tags). De eerste tag-poll per repo is stil.
 
 Via **Geschiedenis…** in het menu open je een doorzoekbaar overzicht van alle gedetecteerde PR's en tags (filter op soort, dubbelklik opent de pagina). De bewaartermijn (2 maanden, 6 maanden, 1 jaar of altijd) stel je in onder Instellingen → Algemeen.
 
