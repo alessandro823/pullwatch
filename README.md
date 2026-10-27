@@ -2,7 +2,7 @@
 
 A macOS menu bar app that notifies you about new pull requests in Azure DevOps and GitHub, plus new tags (optional, per repository). It keeps a searchable history and can check your repositories for outdated languages, frameworks and known vulnerabilities.
 
-The app's interface is in Dutch.
+Available in English, Dutch, German and French: Pullwatch follows the macOS language, or pick one under Settings → General → Language.
 
 ## Install
 

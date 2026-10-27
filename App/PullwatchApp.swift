@@ -5,6 +5,7 @@ import UserNotifications
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = AppLanguage.atLaunch
         UNUserNotificationCenter.current().delegate = Notifier.shared
         AppModel.shared.start()
         DockIcon.shared.start()

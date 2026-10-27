@@ -71,7 +71,7 @@ struct HistoryView: View {
                 } label: {
                     Label("Versies", systemImage: "shippingbox")
                 }
-                .help(selectedRepo.map { "Toon de versies van \($0)" } ?? "Open het versie-overzicht")
+                .help(selectedRepo.map { String(localized: "Toon de versies van \($0)") } ?? String(localized: "Open het versie-overzicht"))
             }
 
             Table(items, selection: $selection) {

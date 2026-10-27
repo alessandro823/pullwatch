@@ -8,8 +8,16 @@ struct MenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Pullwatch").font(.headline)
+                Text(verbatim: "Pullwatch").font(.headline)
                 Spacer()
+                Button {
+                    NSApp.keyWindow?.orderOut(nil)
+                    AboutPanel.show()
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Over Pullwatch")
                 Button {
                     Task { await model.refreshNow() }
                 } label: {
@@ -69,7 +77,7 @@ struct MenuView: View {
             }
         }
         .padding(12)
-        .frame(width: 460)
+        .frame(width: 480)
     }
 }
 
@@ -88,7 +96,7 @@ struct HistoryButton: View {
 /// Opent een venster vanuit het menu: sluit eerst het menu-paneel (anders blijft het erboven
 /// hangen) en haalt het venster daarna naar voren.
 private struct OpenWindowButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let windowId: String
     @Environment(\.openWindow) private var openWindow
 
@@ -108,7 +116,7 @@ private struct OpenWindowButton: View {
 }
 
 private struct SectionHeader: View {
-    let title: String
+    let title: LocalizedStringKey
 
     var body: some View {
         Text(title).font(.caption.bold()).foregroundStyle(.secondary)
@@ -132,7 +140,7 @@ private struct RecentRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.entry.title).lineLimit(1)
                     HStack(spacing: 4) {
-                        Text("\(item.entry.repo) · \(item.entry.author ?? "onbekend") ·")
+                        Text(verbatim: "\(item.entry.repo) · \(item.entry.author ?? String(localized: "onbekend")) ·")
                         Text(item.detectedAt, format: .relative(presentation: .named))
                     }
                     .font(.caption)

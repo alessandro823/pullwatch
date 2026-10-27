@@ -46,7 +46,7 @@ import Testing
     }
 
     @Test func retentionLabels() {
-        #expect(HistoryRetention.allCases.map(\.label) == ["2 maanden", "6 maanden", "1 jaar", "Altijd"])
+        #expect(Set(HistoryRetention.allCases.map(\.label)).count == HistoryRetention.allCases.count)
         #expect(HistoryRetention.oneYear.maxAge == 365 * day)
         #expect(HistoryRetention.forever.maxAge == nil)
     }

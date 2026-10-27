@@ -49,9 +49,9 @@ extension PRState {
 
     var label: String {
         switch self {
-        case .open: "Open"
-        case .merged: "Gemerged"
-        case .closed: "Gesloten"
+        case .open: String(localized: "Open")
+        case .merged: String(localized: "Gemerged")
+        case .closed: String(localized: "Gesloten")
         }
     }
 }

@@ -252,7 +252,7 @@ public struct VersionChecker: Sendable {
                 vulnerabilityIds = Dictionary(uniqueKeysWithValues: zip(dependencies, ids))
                 records = await OSV.records(ids: Set(ids.joined()), http: http, now: now())
             } catch {
-                osvError = "CVE-check mislukt: " + Self.message(error)
+                osvError = String(localized: "CVE-check mislukt: \(Self.message(error))", bundle: .localizedCore)
             }
         }
 

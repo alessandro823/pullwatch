@@ -38,25 +38,25 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             let identifier: String
             switch plan {
             case .pullRequest(let pr):
-                content.title = "\(pr.repo): nieuwe PR"
+                content.title = String(localized: "\(pr.repo): nieuwe PR")
                 content.body = "\(pr.title) — \(pr.authorName)"
                 content.userInfo = ["url": pr.webURL.absoluteString, "key": pr.dedupKey]
                 identifier = pr.dedupKey
             case .tag(let tag):
-                content.title = "\(tag.repo): nieuwe tag"
+                content.title = String(localized: "\(tag.repo): nieuwe tag")
                 content.body = tag.authorName.map { "\(tag.name) — \($0)" } ?? tag.name
                 content.userInfo = ["url": tag.webURL.absoluteString, "key": tag.dedupKey]
                 identifier = tag.dedupKey
             case .completed(let pr):
-                content.title = "\(pr.repo): PR completed"
+                content.title = String(localized: "\(pr.repo): PR completed")
                 content.body = "\(pr.title) — \(pr.authorName)"
                 content.userInfo = ["url": pr.webURL.absoluteString, "key": pr.dedupKey]
                 identifier = pr.dedupKey + ":completed"
             case .summary(let kind, let count, let lines):
                 switch kind {
-                case .pullRequest: content.title = "\(count) nieuwe PR's"
-                case .tag: content.title = "\(count) nieuwe tags"
-                case .completed: content.title = "\(count) PR's completed"
+                case .pullRequest: content.title = String(localized: "\(count) nieuwe PR's")
+                case .tag: content.title = String(localized: "\(count) nieuwe tags")
+                case .completed: content.title = String(localized: "\(count) PR's completed")
                 }
                 content.body = lines.joined(separator: "\n")
                 identifier = UUID().uuidString
@@ -76,7 +76,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         if items.count <= 3 {
             for (repo, v) in items {
                 let content = UNMutableNotificationContent()
-                content.title = "\(repo): nieuwe kwetsbaarheid"
+                content.title = String(localized: "\(repo): nieuwe kwetsbaarheid")
                 content.body = [line(v), v.summary].compactMap { $0 }.joined(separator: "\n")
                 content.userInfo = ["url": v.url.absoluteString]
                 content.sound = .default
@@ -84,8 +84,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             }
         } else {
             let content = UNMutableNotificationContent()
-            content.title = "\(items.count) nieuwe kwetsbaarheden"
-            content.body = (items.prefix(3).map { "\($0.repo): \(line($0.vulnerability))" } + ["Zie Versies… in het menu"])
+            content.title = String(localized: "\(items.count) nieuwe kwetsbaarheden")
+            content.body = (items.prefix(3).map { "\($0.repo): \(line($0.vulnerability))" } + [String(localized: "Zie Versies… in het menu")])
                 .joined(separator: "\n")
             content.sound = .default
             add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
@@ -95,7 +95,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func deliverAuthFailure(accountName: String) {
         let content = UNMutableNotificationContent()
         content.title = "Pullwatch: \(accountName)"
-        content.body = "Token ongeldig of verlopen. Werk het bij in Instellingen."
+        content.body = String(localized: "Token ongeldig of verlopen. Werk het bij in Instellingen.")
         add(UNNotificationRequest(identifier: "auth-\(accountName)", content: content, trigger: nil))
     }
 

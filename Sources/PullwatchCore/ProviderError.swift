@@ -14,23 +14,24 @@ public enum ProviderError: Error, Equatable, Sendable {
     public var userMessage: String {
         switch self {
         case .unauthorized:
-            return "Token ongeldig of verlopen"
+            return String(localized: "Token ongeldig of verlopen", bundle: .localizedCore)
         case .rateLimited(let until):
-            return "Rate limit, opnieuw om \(until.formatted(date: .omitted, time: .shortened))"
+            return String(localized: "Rate limit, opnieuw om \(until.formatted(date: .omitted, time: .shortened))", bundle: .localizedCore)
         case .server(let status):
-            return "Serverfout (\(status))"
+            return String(localized: "Serverfout (\(status))", bundle: .localizedCore)
         case .network(let message):
-            return "Netwerkfout: \(message)"
+            return String(localized: "Netwerkfout: \(message)", bundle: .localizedCore)
         case .decoding(let message):
-            return "Onverwacht antwoord: \(message)"
+            return String(localized: "Onverwacht antwoord: \(message)", bundle: .localizedCore)
         case .cliNotFound(let name):
-            return "\(name) niet gevonden (installeer via Homebrew)"
+            return String(localized: "\(name) niet gevonden (installeer via Homebrew)", bundle: .localizedCore)
         case .cliNotLoggedIn(let name):
-            return "Niet ingelogd, voer `\(name == "az" ? "az login" : "gh auth login")` uit"
+            let command = name == "az" ? "az login" : "gh auth login"
+            return String(localized: "Niet ingelogd, voer `\(command)` uit", bundle: .localizedCore)
         case .missingToken:
-            return "Geen token ingesteld"
+            return String(localized: "Geen token ingesteld", bundle: .localizedCore)
         case .noAccess(let name):
-            return "Geen toegang tot \"\(name)\", controleer de naam"
+            return String(localized: "Geen toegang tot \"\(name)\", controleer de naam", bundle: .localizedCore)
         }
     }
 }

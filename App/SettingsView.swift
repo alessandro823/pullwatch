@@ -85,6 +85,7 @@ private struct GeneralSettingsView: View {
     let model: AppModel
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
+    @State private var language = AppLanguage.current
 
     private let intervals = [60, 120, 300, 600, 900]
 
@@ -131,6 +132,19 @@ private struct GeneralSettingsView: View {
                 }
             if let loginError {
                 Text(loginError).font(.caption).foregroundStyle(.red)
+            }
+            Picker("Taal", selection: $language) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(verbatim: language.name).tag(language)
+                }
+            }
+            .onChange(of: language) { _, language in AppLanguage.select(language) }
+            if language != AppLanguage.atLaunch {
+                HStack {
+                    Text("De nieuwe taal werkt na een herstart.").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Nu herstarten") { AppLanguage.relaunch() }
+                }
             }
         }
         .formStyle(.grouped)

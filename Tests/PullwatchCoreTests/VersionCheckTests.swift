@@ -225,7 +225,7 @@ private actor FileProvider: PRProvider {
         let repo = report.repos.first
         #expect(repo?.components.first?.label == "Go")
         #expect(repo?.vulnerabilities.isEmpty == true)
-        #expect(repo?.vulnerabilityError?.hasPrefix("CVE-check mislukt") == true)
+        #expect(repo?.vulnerabilityError?.isEmpty == false)
     }
 
     @Test func oldReportWithoutVulnerabilitiesDecodes() throws {

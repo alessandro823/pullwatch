@@ -25,14 +25,14 @@ struct AccountEditor: View {
         Form {
             Section("Account") {
                 TextField("Naam", text: $draft.displayName)
-                TextField(draft.kind == .azureDevOps ? "Organisatie" : "Owner (user of org)", text: $draft.organization)
+                TextField(draft.kind == .azureDevOps ? String(localized: "Organisatie") : String(localized: "Owner (user of org)"), text: $draft.organization)
                 Picker("Authenticatie", selection: $draft.authMethod) {
                     Text("Personal Access Token").tag(AuthMethod.pat)
                     Text(draft.kind == .azureDevOps ? "Azure CLI (az login)" : "GitHub CLI (gh auth login)").tag(AuthMethod.cli)
                 }
                 if draft.authMethod == .pat {
                     SecureField(
-                        storedPAT ? "Opgeslagen — leeg laten om te behouden" : "Token",
+                        storedPAT ? String(localized: "Opgeslagen — leeg laten om te behouden") : String(localized: "Token"),
                         text: $pat
                     )
                 }
@@ -201,12 +201,12 @@ struct AccountEditor: View {
     }
 
     private func testConnection() async {
-        connectionMessage = "Bezig…"
+        connectionMessage = String(localized: "Bezig…")
         defer { testTask = nil }
         do {
             let name = try await provider().testConnection()
             if Task.isCancelled { return }
-            connectionMessage = "✓ Verbonden als \(name)"
+            connectionMessage = "✓ " + String(localized: "Verbonden als \(name)", comment: "Naam van de ingelogde gebruiker")
         } catch let error as ProviderError {
             if Task.isCancelled { return }
             connectionMessage = "✗ \(error.userMessage)"
@@ -251,7 +251,7 @@ private struct NotifyButton: View {
                 .opacity(isEnabled ? 1 : 0.3)
         }
         .buttonStyle(.borderless)
-        .help(isOn ? "Melding aan; klik om alleen te volgen zonder melding" : "Geen melding; staat wel in menu en geschiedenis")
+        .help(isOn ? String(localized: "Melding aan; klik om alleen te volgen zonder melding") : String(localized: "Geen melding; staat wel in menu en geschiedenis"))
     }
 }
 
@@ -271,6 +271,6 @@ private struct AllNotifyButton: View {
         }
         .buttonStyle(.borderless)
         .disabled(sources.isEmpty)
-        .help(allOn ? "Meldingen uit voor alle zichtbare repo's" : "Meldingen aan voor alle zichtbare repo's")
+        .help(allOn ? String(localized: "Meldingen uit voor alle zichtbare repo's") : String(localized: "Meldingen aan voor alle zichtbare repo's"))
     }
 }

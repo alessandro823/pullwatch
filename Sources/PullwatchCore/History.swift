@@ -93,10 +93,10 @@ public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
 
     public var label: String {
         switch self {
-        case .twoMonths: return "2 maanden"
-        case .sixMonths: return "6 maanden"
-        case .oneYear: return "1 jaar"
-        case .forever: return "Altijd"
+        case .twoMonths: return String(localized: "2 maanden", bundle: .localizedCore)
+        case .sixMonths: return String(localized: "6 maanden", bundle: .localizedCore)
+        case .oneYear: return String(localized: "1 jaar", bundle: .localizedCore)
+        case .forever: return String(localized: "Altijd", bundle: .localizedCore)
         }
     }
 }

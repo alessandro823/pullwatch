@@ -1,6 +1,7 @@
 name: Pullwatch
 options:
   bundleIdPrefix: nl.torrisi
+  developmentLanguage: en
   deploymentTarget:
     macOS: "14.0"
 packages:
@@ -19,8 +20,11 @@ targets:
       properties:
         LSUIElement: true
         CFBundleDisplayName: Pullwatch
-        CFBundleShortVersionString: "0.2.1"
-        CFBundleVersion: "3"
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [nl, en, de, fr]
+        NSHumanReadableCopyright: "© 2026 Alessandro Torrisi"
+        CFBundleShortVersionString: "0.3.0"
+        CFBundleVersion: "4"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.torrisi.pullwatch
