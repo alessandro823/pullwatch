@@ -1,61 +1,98 @@
 # Pullwatch
 
-macOS menubar-app die nieuwe pull requests in Azure DevOps en GitHub meldt, plus nieuwe tags (optioneel per repo).
+A macOS menu bar app that notifies you about new pull requests in Azure DevOps and GitHub, plus new tags (optional, per repository). It keeps a searchable history and can check your repositories for outdated languages, frameworks and known vulnerabilities.
 
-## Vereisten
+The app's interface is in Dutch.
 
-- macOS 14+
-- Xcode (Swift 6)
-- `brew install xcodegen`
-- Optioneel: `az` (`az login`) en/of `gh` (`gh auth login`) voor CLI-authenticatie
+## Install
 
-## Bouwen en installeren
+Download the latest `Pullwatch-x.y.z.dmg` from [Releases](https://github.com/alessandro823/pullwatch/releases), open it and drag Pullwatch to Applications.
+
+The app is ad-hoc signed, not notarized. On first launch macOS will refuse to open it; right-click the app → **Open**, or run:
 
 ```bash
-make test      # unit-tests van PullwatchCore
-make install   # bouwt en kopieert naar ~/Applications/Pullwatch.app
-make run       # install + starten
+xattr -dr com.apple.quarantine /Applications/Pullwatch.app
 ```
 
-## Gebruik
+Requires macOS 14 or later.
 
-1. Klik op het icoon in de menubar → **Instellingen…**
-2. Voeg een account toe (Azure DevOps of GitHub), kies PAT of CLI, test de verbinding.
-3. Kies per account welke repos je volgt (alles behalve / alleen geselecteerde).
+## Build from source
 
-Tags volg je door per repo het vinkje voor tags aan te zetten; ze staan standaard overal uit. Naast elk vinkje (PR's, Tags, Completed) staat een belletje: zet je dat uit, dan volg je de repo nog wel (menu en geschiedenis), maar krijg je er geen melding van. Het belletje in de kop zet het voor alle zichtbare repo's aan of uit. Tags worden elke 15 minuten gepolld (los van het PR-interval; "Nu verversen" pollt ook tags). De eerste tag-poll per repo is stil.
+- Xcode (Swift 6)
+- `brew install xcodegen`
+- Optional: `az` (`az login`) and/or `gh` (`gh auth login`) for CLI authentication
 
-Via **Geschiedenis…** in het menu open je een doorzoekbaar overzicht van alle gedetecteerde PR's en tags (filter op soort, dubbelklik opent de pagina). De bewaartermijn (2 maanden, 6 maanden, 1 jaar of altijd) stel je in onder Instellingen → Algemeen.
+```bash
+make test      # PullwatchCore unit tests
+make install   # build and copy to ~/Applications/Pullwatch.app
+make run       # install + launch
+make dmg       # build dist/Pullwatch-<version>.dmg
+```
 
-### Geschiedenis ophalen en bijhouden
+## Usage
 
-Pullwatch haalt ook al bestaande PR's (open, gemerged en gesloten) op voor de geschiedenis. De eerste keer gaat dat terug tot de ingestelde bewaartermijn, met maximaal 1000 PR's per account; daarna wordt de geschiedenis elke 15 minuten bijgewerkt (status, titel en sluitdatum). Opgehaalde PR's geven geen melding en staan als gelezen in de lijst; de kolom **Status** toont Open, Gemerged of Gesloten. Een wijziging van het repo-filter of de bewaartermijn start voor dat account opnieuw met een eerste keer ophalen. De GitHub-zoek-API heeft een eigen limiet van 30 verzoeken per minuut; bij een limiet wacht Pullwatch tot die is verlopen en loopt de PR-polling gewoon door.
+1. Click the menu bar icon → **Instellingen…** (Settings).
+2. Add an account (Azure DevOps or GitHub), choose PAT or CLI, and test the connection.
+3. Per account, choose which repositories you follow: PR's, Tags and/or Completed (merged PRs).
 
-Bestaande PR's worden bij het toevoegen stil overgeslagen; alleen nieuwe PR's geven een melding.
+Tags are off by default. Next to each checkbox is a bell: turn it off to keep following the repository (menu and history) without getting notifications. The bell in the header toggles all visible repositories. Tags are polled every 15 minutes (separate from the PR interval; "Nu verversen" polls tags too). The first tag poll per repository is silent.
 
-Aanroepen van `az` en `gh` time-outen na 20 seconden.
+While a window (settings, history, versions) is open, Pullwatch shows in the Dock; close the last window and it runs from the menu bar only.
 
-### Versies
+### History
 
-Via **Versies…** in het menu check je welke gevolgde repo's (minstens één vinkje) achterlopen. Pullwatch leest per repo `go.mod`, `*.csproj`/`*.fsproj`/`Directory.Build.props`, `package.json` (Node, Angular, React, Vue, Next.js, Nuxt), `composer.json` (PHP, Symfony, Laravel), `rust-toolchain(.toml)` en `rust-version` in de root-`Cargo.toml` (Rust), `swift-tools-version` in `Package.swift` (Swift; niet op endoflife.date, dus altijd **Onbekend**), `python-version`/`node-version`/`go-version`/`dotnet-version` in `.github/workflows/*.yml` (als minimum), `.nvmrc`, `pyproject.toml`, `.python-version` en `Dockerfile*` op de default branch, en vergelijkt de versies met [endoflife.date](https://endoflife.date). Een versie-eis die alleen een minimum is (`engines.node`, `php` in `composer.json`, `requires-python`, `rust-version`) telt niet als dezelfde taal ergens echt vastgezet is (Docker-image, `.nvmrc`, `rust-toolchain`), en een `go.mod` die via `replace … => ./pad` als lokale kopie van een dependency dient telt niet mee. Voor frameworks gaat de geïnstalleerde versie uit `package-lock.json`/`composer.lock` voor het minimum uit het manifest. Eigen Docker-images worden herkend aan een bekende naam vóór het eerste streepje (`php-fpm-alpine:8.4` → PHP 8.4); `ARG`-standaardwaarden in `FROM` worden ingevuld. Status: **Actueel**, **Achter** (er is een nieuwere major/minor; patches tellen niet), **EOL** of **Onbekend**. De check draait eens per dag vanzelf (uit te zetten onder Instellingen → Algemeen) en altijd via **Opnieuw checken**; het laatste resultaat blijft bewaard. Komt er bij een automatische check een nieuwe CVE bij, dan krijg je een melding; de eerste check, nieuw gevolgde repo's en repo's waarvan de vorige CVE-check mislukte geven geen melding. Een check die helemaal mislukt (bv. offline) wordt na een uur opnieuw geprobeerd.
+**Geschiedenis…** opens a searchable list of every detected PR and tag (filter by kind, double-click opens the page). Retention (2 months, 6 months, 1 year or forever) is set under Settings → General.
 
-Dezelfde check zoekt bekende kwetsbaarheden (CVE's) via [OSV.dev](https://osv.dev) in packages met een exacte versie: `go.mod` (requires), `package-lock.json`, `PackageReference`/`PackageVersion` in .NET-projectbestanden, `requirements*.txt` (alleen `==`), `poetry.lock`, `uv.lock`, `composer.lock`, `Cargo.lock` (alleen crates.io) en `Package.resolved` (Swift-packages met een versie). `yarn.lock` en `pnpm-lock.yaml` worden niet gelezen. Per repo zie je het aantal kwetsbaarheden per ernst, met link, getroffen package en de versie waarin het opgelost is. Met de kopieerknop zet je de versies en kwetsbaarheden van een repo als tekst op het klembord. Met ↻ naast de kopieerknop check je één repo opnieuw (bv. na een update), zonder de rest.
+Pullwatch also fetches existing PRs (open, merged and closed) for the history. The first time it goes back to the retention period, with at most 1000 PRs per account; after that the history is updated every 15 minutes (state, title and close date). Fetched PRs don't notify and are marked as read. Changing the repository filter or retention restarts the initial fetch for that account. The GitHub search API has its own limit of 30 requests per minute; when hit, Pullwatch waits it out while PR polling carries on.
 
-Heeft een repo tags, dan wordt ook de nieuwste tag gecheckt (hoogste versienummer; pre-releases zoals `-rc1` alleen als er geen andere zijn). De tag staat naast de reponaam; wijkt een onderdeel in die release af van de default branch, dan zie je beide versies. Bij elke kwetsbaarheid staat of hij **ook in de tag** zit of **alleen op main** (nieuw sinds de release). Wat op main al opgelost is telt niet: geen melding, geen status, niet in de lijst. Via **Versies** in Geschiedenis (of rechtsklik op een regel) open je het overzicht gefilterd op die repo.
+Calls to `az` and `gh` time out after 20 seconds.
 
-### PAT-scopes
+### Versions
 
-- Azure DevOps: **Code (Read)** (volstaat ook voor tags) en **Project and Team (Read)** (de projectenlijst komt van `/_apis/projects`)
-- GitHub (fine-grained): **Pull requests: Read** en **Metadata: Read** op de gewenste repos, plus **Contents: Read** voor Versies. Tags (`GET /repos/{owner}/{repo}/tags`) vereisen volgens de GitHub-documentatie alleen **Metadata: Read**, niet Contents (niet getest met een live PAT); classic: `repo`
+**Versies…** shows which followed repositories are behind. Per repository Pullwatch reads, on the default branch:
 
-## Bekende eigenaardigheden
+| File | Detects |
+|---|---|
+| `go.mod` | Go |
+| `*.csproj`, `*.fsproj`, `Directory.Build.props` | .NET |
+| `package.json` | Node (`engines`), Angular, React, Vue, Next.js, Nuxt |
+| `composer.json` | PHP, Symfony, Laravel |
+| `rust-toolchain(.toml)`, root `Cargo.toml` | Rust |
+| `Package.swift` | Swift (`swift-tools-version`; not on endoflife.date, so always unknown) |
+| `.nvmrc`, `.node-version`, `pyproject.toml`, `.python-version` | Node, Python |
+| `Dockerfile*` | base images (node, golang, python, dotnet, alpine, debian, ubuntu, nginx, postgres, redis, eclipse-temurin, rust, php, ruby) |
+| `.github/workflows/*.yml` | `python-version`, `node-version`, `go-version`, `dotnet-version` |
 
-- Door ad-hoc signing kan macOS na elke `make install` opnieuw om Keychain-toegang vragen voor PAT-accounts; kies "Altijd toestaan".
-- Bij de eerste start vraagt Pullwatch om toestemming voor meldingen.
-- `make run` herstart een al draaiende Pullwatch niet; sluit hem eerst af via het menu "Stop".
+Versions are compared with [endoflife.date](https://endoflife.date): **Actueel** (current), **Achter** (a newer major/minor exists; patches don't count), **EOL** or **Onbekend** (unknown).
+
+- A version requirement that is only a minimum (`engines.node`, `php` in `composer.json`, `requires-python`, `rust-version`, CI versions) is dropped when the same language is pinned elsewhere (Docker image, `.nvmrc`, `rust-toolchain`).
+- A `go.mod` used as a local copy of a dependency (`replace … => ./path`) is ignored.
+- For frameworks, the installed version from `package-lock.json`/`composer.lock` wins over the manifest's minimum.
+- Custom Docker images are recognised by a known name before the first dash (`php-fpm-alpine:8.4` → PHP 8.4); `ARG` defaults in `FROM` are filled in.
+
+The same check looks up known vulnerabilities via [OSV.dev](https://osv.dev) for packages with an exact version: `go.mod`, `package-lock.json`, `PackageReference`/`PackageVersion` in .NET projects, `requirements*.txt` (`==` only), `poetry.lock`, `uv.lock`, `composer.lock`, `Cargo.lock` (crates.io only) and `Package.resolved`. `yarn.lock` and `pnpm-lock.yaml` are not read. Package names and versions are sent to api.osv.dev, also for private repositories.
+
+If a repository has tags, the newest version tag is checked too (pre-releases like `-rc1` only if there is nothing else). Each vulnerability on the default branch is marked as also in that release or new since it. Anything already fixed on the default branch is not reported.
+
+The check runs once a day (can be turned off under Settings → General) and on **Opnieuw checken**; ↻ re-checks a single repository and the copy button puts a repository's versions and vulnerabilities on the clipboard. New CVEs found by the daily check trigger a notification. From the history window, **Versies** (or right-click a row) opens the versions filtered on that repository.
+
+### PAT scopes
+
+- Azure DevOps: **Code (Read)** (also covers tags) and **Project and Team (Read)** (the project list comes from `/_apis/projects`).
+- GitHub (fine-grained): **Pull requests: Read** and **Metadata: Read** on the repositories you want, plus **Contents: Read** for Versions. Classic: `repo`.
+
+## Known quirks
+
+- Because of ad-hoc signing, macOS may ask for Keychain access again after each `make install` for PAT accounts; choose "Always Allow".
+- On first launch Pullwatch asks for permission to send notifications.
+- `make run` doesn't restart a running Pullwatch; quit it first via **Stop** in the menu.
 
 ## Data
 
-`~/Library/Application Support/Pullwatch/` — `config.json`, `seen.json`, `history.json` (geschiedenis van PR's en tags), `versions.json` (laatste versiecheck). Tokens staan in de Keychain (`nl.torrisi.pullwatch`).
+`~/Library/Application Support/Pullwatch/`: `config.json`, `seen.json`, `history.json`, `versions.json`. Tokens are stored in the Keychain (`nl.torrisi.pullwatch`).
 
 Logs: `log stream --predicate 'subsystem == "nl.torrisi.pullwatch"'`
+
+## License
+
+[Apache 2.0](LICENSE)
