@@ -1,0 +1,1 @@
+- Under the filter of one organization, user or project in the sidebar, the Repository column of the pull request and tag lists shows the repository without that name in front (`specifications #12` instead of `openEHR/specifications #12`). The tooltip still gives the full reference.

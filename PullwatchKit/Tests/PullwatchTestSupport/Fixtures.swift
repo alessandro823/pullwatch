@@ -63,6 +63,7 @@ extension Account {
         organization: String = "acme",
         repoWatch: [String: WatchSet] = [:],
         newRepoDefault: NewRepoDefault = .prs,
+        showDrafts: Bool = true,
         includeDrafts: Bool = false,
         hideOwn: Bool = true
     ) -> Account {
@@ -73,6 +74,7 @@ extension Account {
             authMethod: .pat,
             repoWatch: repoWatch,
             newRepoDefault: newRepoDefault,
+            showDrafts: showDrafts,
             includeDrafts: includeDrafts,
             hideOwn: hideOwn,
             // Bitbucket is pas af met het e-mailadres van het Atlassian-account.

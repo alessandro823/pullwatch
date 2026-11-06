@@ -284,6 +284,7 @@ public actor PollEngine {
                     }
                     let fresh = handleSuccess(job.account, fetched, retention: retention, at: t, interval: interval)
                     result.newPullRequests += fresh.pullRequests
+                    result.quietPullRequests += fresh.quiet
                     result.newTags += fresh.tags
                     result.updatedTags += fresh.updated
                     result.syncedTags += fresh.backfill
@@ -422,7 +423,7 @@ public actor PollEngine {
         retention: HistoryRetention,
         at t: Date,
         interval: TimeInterval
-    ) -> (pullRequests: [PullRequest], tags: [Tag], updated: [Tag], backfill: [Tag]) {
+    ) -> (pullRequests: [PullRequest], quiet: [PullRequest], tags: [Tag], updated: [Tag], backfill: [Tag]) {
         let settings = account.filterSettings
         let key = account.id.uuidString
         let previous = state.lastSettings[key].flatMap { $0.sameSource(as: settings) ? $0 : nil }
@@ -434,12 +435,20 @@ public actor PollEngine {
         }
 
         var fresh: [PullRequest] = []
+        var quiet: [PullRequest] = []
         for pr in fetched.pullRequests.map(withDetails)
         where PRFilter.passes(pr, settings: settings, currentUserId: fetched.userId) {
-            // Alleen melden als de PR onder de vorige settings ook zichtbaar was; anders is hij
-            // pas zichtbaar door een instellingswijziging of eerste poll → stil seeden.
+            // Een draft zonder melding komt gelezen in de lijst en wordt niet als gezien
+            // gemarkeerd: is hij later klaar voor review, dan meldt hij als nieuwe PR.
+            guard PRFilter.notifies(pr, settings: settings) else {
+                quiet.append(pr)
+                continue
+            }
+            // Alleen melden als de PR onder de vorige settings ook gemeld zou zijn; anders meldt
+            // hij pas door een instellingswijziging of eerste poll → stil seeden.
             if !state.contains(pr.dedupKey), let previous, previous.covers(repo: pr.repo),
-               PRFilter.passes(pr, settings: previous, currentUserId: fetched.userId) {
+               PRFilter.passes(pr, settings: previous, currentUserId: fetched.userId),
+               PRFilter.notifies(pr, settings: previous) {
                 fresh.append(pr)
             }
             state.mark(pr.dedupKey, at: t)
@@ -462,7 +471,7 @@ public actor PollEngine {
         schedules[account.id] = schedule
         statuses[account.id] = .ok(lastPoll: t)
         let tags = handleTags(account, fetched, notBefore: retention.maxAge.map { t - $0 }, at: t)
-        return (fresh, tags.fresh, tags.updated, tags.backfill)
+        return (fresh, quiet, tags.fresh, tags.updated, tags.backfill)
     }
 
     /// Verwerkt de geschiedenis-sync: plant de volgende sync en geeft de gefilterde PR's terug,

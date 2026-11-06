@@ -49,6 +49,20 @@ import PullwatchTestSupport
         #expect(prs.first { $0.number == 3 }?.mergeQueue == nil)
     }
 
+    /// "Merge when ready" of "Enable auto-merge" zet alleen `autoMergeRequest`; de PR komt pas in
+    /// de merge queue als zijn checks slagen. GitHub toont hem tot dan als open, Pullwatch ook.
+    @Test func `Auto-merge before the queue is kept but not queued`() async throws {
+        let http = makeHTTP(graphQL: #"""
+            {"data":{"pr0":{"pullRequest":{"isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":{"enabledAt":"2025-10-15T11:00:00Z"}}},
+                     "pr1":{"pullRequest":{"isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":null}}}}
+            """#)
+        let prs = try await makeProvider(http).openPullRequests()
+
+        let first = try #require(prs.first { $0.number == 1 })
+        #expect(first.mergeQueue == MergeQueueEntry(kind: .autoMerge, enqueuedAt: Date(timeIntervalSince1970: 1_760_526_000)))
+        #expect(!first.isQueued)
+    }
+
     @Test func `Drafts are not asked, the rest in one request`() async throws {
         let http = makeHTTP(graphQL: queued)
         _ = try await makeProvider(http).openPullRequests()

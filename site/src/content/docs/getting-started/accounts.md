@@ -68,7 +68,7 @@ Each account lists its repositories. Per repository, tick what you want:
 - **Tags**: new tags, and on GitHub, GitLab, Codeberg, Forgejo and Gitea the releases made for them. Tags are off by default.
 - **Merged**: pull requests that get merged.
 
-Next to each tick is a bell. Turn it off to keep a repository in the menu and the history without notifications. The bell in the header switches all visible repositories at once. Per account you can also include draft pull requests, hide your own, and turn the whole account off for a while.
+Next to each tick is a bell. Turn it off to keep a repository in the menu and the history without notifications. The bell in the header switches all visible repositories at once. Draft pull requests appear in the menu and the history with the draft icon, as on GitHub. Per account you can turn that off with **Show draft PRs**: drafts then appear nowhere, and a pull request arrives once it is ready for review. With **Notify about draft PRs** a new draft also gives a notification. You can also hide your own pull requests and turn the whole account off for a while.
 
 ## Repositories outside your account
 

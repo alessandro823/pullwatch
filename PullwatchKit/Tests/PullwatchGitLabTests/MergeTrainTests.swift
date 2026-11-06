@@ -36,12 +36,12 @@ import PullwatchTestSupport
         http.requests.compactMap { $0.url?.absoluteString }.filter { $0.contains("merge_trains") }
     }
 
-    @Test func `Auto-merge without a train is queued without a position`() async throws {
+    @Test func `Auto-merge without a train is kept but not queued`() async throws {
         let http = makeHTTP(trains: #"{"message":"403 Forbidden"}"#, trainStatus: 403)
         let prs = try await makeProvider(http).openPullRequests()
 
         #expect(prs.first { $0.number == 12 }?.mergeQueue == MergeQueueEntry(kind: .autoMerge))
-        #expect(prs.first { $0.number == 12 }?.isQueued == true)
+        #expect(prs.first { $0.number == 12 }?.isQueued == false)
         #expect(prs.first { $0.number == 14 }?.mergeQueue == nil)
     }
 

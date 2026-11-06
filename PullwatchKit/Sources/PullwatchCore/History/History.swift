@@ -142,7 +142,7 @@ public struct History: Codable, Equatable, Sendable {
         return changed
     }
 
-    /// Werkt status, sluitdatum, titel, foto van de auteur, co-auteurs en checks van een PR-item
+    /// Werkt status, draft, sluitdatum, titel, foto van de auteur, co-auteurs en checks van een PR-item
     /// bij. Een lege lijst co-auteurs, ontbrekende checks en een ontbrekende foto laten de bewaarde
     /// staan: die betekenen meestal "deze poll niet opgehaald". Zo krijgt een PR uit oude
     /// geschiedenis (zonder foto) die van de API zodra hij weer gesynct wordt. Geeft `true` als er
@@ -154,11 +154,13 @@ public struct History: Codable, Equatable, Sendable {
         let avatar = pr.authorAvatarURL ?? existing.authorAvatarURL
         // De wachtrij komt per poll (`update(mergeQueues:)`); na een merge of sluiten is hij voorbij.
         let mergeQueue = pr.state == .open ? existing.mergeQueue : nil
-        guard existing.state != pr.state || existing.closedAt != pr.closedAt || existing.title != pr.title
+        guard existing.state != pr.state || existing.isDraft != pr.isDraft || existing.closedAt != pr.closedAt
+                || existing.title != pr.title
                 || existing.coAuthors != coAuthors || existing.checks != checks
                 || existing.mergeQueue != mergeQueue || existing.authorAvatarURL != avatar else { return false }
         existing.mergeQueue = mergeQueue
         existing.state = pr.state
+        existing.isDraft = pr.isDraft
         existing.closedAt = pr.closedAt
         existing.title = pr.title
         existing.coAuthors = coAuthors

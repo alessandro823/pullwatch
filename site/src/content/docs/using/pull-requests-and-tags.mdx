@@ -17,9 +17,9 @@ The number is written as the service writes it: FerroHEALTH/FerroFED #1570 on Gi
 
 To find one pull request, search for `1570`, `#1570`, `!42`, `FerroFED#1570` or `FerroHEALTH/FerroFED#1570`. A bare number also finds titles with that number in them. **Copy Reference** in the Item menu (⌥⇧⌘L) puts `FerroHEALTH/FerroFED#1570` on the clipboard, ready for a commit message, an issue or a chat.
 
-An open pull request that waits to merge by itself shows as queued, with an amber icon: in a merge queue or with auto-merge on GitHub, in the merge queue on Bitbucket Cloud, in a merge train or set to merge when the pipeline succeeds on GitLab, or with auto-complete on Azure DevOps.
+An open pull request that is really in a queue shows as queued, with an amber icon: in the merge queue on GitHub or Bitbucket Cloud, or in a merge train on GitLab. As on GitHub, a pull request with only auto-merge (GitHub, GitLab) or auto-complete (Azure DevOps) on stays open until it enters the queue.
 
-In the sidebar you can expand **PRs**, **Tags and Releases** and **Repositories** into their projects (Azure DevOps) or owners (GitHub and GitLab), each with its own unread count. Selecting one filters the list and the search to it. The badges count what is unread.
+In the sidebar you can expand **PRs**, **Tags and Releases** and **Repositories** into their projects (Azure DevOps) or owners (GitHub and GitLab), each with its own unread count. Selecting one filters the list and the search to it, and the Repository column then leaves that name out: FerroFED #1570 instead of FerroHEALTH/FerroFED #1570. The badges count what is unread.
 
 When you add an account, Pullwatch fetches its existing pull requests (open, merged and closed), back as far as the history goes and at most 1000 per account. Those do not notify you and arrive marked as read. After that the history is updated every 15 minutes: state, title and close date. Changing which repositories an account follows, or how long the history is kept, starts this first fetch again for that account.
 

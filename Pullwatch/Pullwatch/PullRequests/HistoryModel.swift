@@ -175,7 +175,8 @@ final class HistoryModel {
         // Na add: een gemelde PR staat dan al ongelezen in de geschiedenis en blijft dat.
         // PR's van vóór de bewaartermijn niet toevoegen: die zou prune meteen weer verwijderen.
         let cutoff = retention.maxAge.map { now - $0 }
-        if history.merge(synced: result.syncedPullRequests, notBefore: cutoff) { changed = true }
+        // Drafts zonder melding komen er net zo in: gelezen, op hun plek.
+        if history.merge(synced: result.syncedPullRequests + result.quietPullRequests, notBefore: cutoff) { changed = true }
         // Bestaande tags uit de eerste tag-poll van een repo: gelezen, zonder melding.
         if history.merge(syncedTags: result.syncedTags, notBefore: cutoff) { changed = true }
         // Bekende tags krijgen hun auteur en release bij, zonder melding en op hun plek.

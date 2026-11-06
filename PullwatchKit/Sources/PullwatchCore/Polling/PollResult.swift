@@ -10,6 +10,9 @@ public enum AccountState: Equatable, Sendable {
 /// Wat één `PollEngine.poll` opleverde over alle accounts.
 public struct PollResult: Equatable, Sendable {
     public var newPullRequests: [PullRequest] = []
+    /// Open drafts die de lijst toont zonder melding, omdat "Draft-PR's melden" uit staat
+    /// (`PRFilter.notifies`). Gelezen in de geschiedenis, zoals de sync. Niet bedoeld voor meldingen.
+    public var quietPullRequests: [PullRequest] = []
     /// Nieuwe tags, en bekende tags die net een release kregen, gesorteerd op repo en dan naam.
     public var newTags: [Tag] = []
     /// Bekende tags zoals ze nu zijn (auteur, release), om de geschiedenis bij te werken. Alleen van

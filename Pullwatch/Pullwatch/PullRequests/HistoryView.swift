@@ -141,10 +141,12 @@ struct HistoryView: View {
                 .accessibilityValue(item.isRead ? Text(verbatim: "") : Text("Ongelezen"))
             }
             .width(min: 180, ideal: 300)
-            // Bij een PR de korte naam met het nummer (`FerroFED #1570`), zoals GitHub; sorteren
+            // Bij een PR de naam met het nummer (`FerroHEALTH/FerroFED #1570`), zoals GitHub; sorteren
             // houdt een repo bij elkaar en zet zijn PR's op nummer (`RepoSortKey`).
             TableColumn("Repo", value: \.entry.repoSortKey) { item in
-                RepoReferenceLabel(entry: item.entry, kind: kind(of: item))
+                // Onder het filter van een organisatie of project staat die naam al in de
+                // zijbalk en de titel: de repo dan zonder.
+                RepoReferenceLabel(entry: item.entry, kind: kind(of: item), showsOwner: group == nil)
             }
             .width(min: 100, ideal: 180)
             TableColumn("Auteur", value: \.authorSortKey) { item in

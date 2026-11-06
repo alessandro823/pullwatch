@@ -21,6 +21,14 @@ public struct HistoryGroup: Hashable, Sendable, Identifiable {
         }
     }
 
+    /// De repo-naam zonder de groep ervoor, zoals in een lijst die al op die groep filtert:
+    /// `openEHR/specifications` wordt `specifications`, `groep/sub/project` wordt `sub/project`.
+    /// Een naam zonder "/" blijft zoals hij is.
+    public static func repoName(_ repo: String) -> String {
+        let parts = repo.split(separator: "/", maxSplits: 1)
+        return parts.count == 2 ? String(parts[1]) : repo
+    }
+
     /// Groepen met hun teller, op naam; dezelfde projectnaam bij twee accounts krijgt de accountnaam erachter.
     static func named(_ counts: [ID: Int], accountNames: [UUID: String]) -> [HistoryGroup] {
         let projectCounts = Dictionary(grouping: counts.keys, by: \.project).mapValues(\.count)

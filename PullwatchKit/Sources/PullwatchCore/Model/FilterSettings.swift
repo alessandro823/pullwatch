@@ -7,6 +7,7 @@ public struct FilterSettings: Codable, Hashable, Sendable {
     public var organization: String
     public var repoWatch: [String: WatchSet]
     public var newRepoDefault: NewRepoDefault
+    public var showDrafts: Bool
     public var includeDrafts: Bool
     public var hideOwn: Bool
     /// `Account.extraRepos`, lowercased en gesorteerd; leeg in oude JSON.
@@ -17,6 +18,7 @@ public struct FilterSettings: Codable, Hashable, Sendable {
         organization: String,
         repoWatch: [String: WatchSet],
         newRepoDefault: NewRepoDefault,
+        showDrafts: Bool = true,
         includeDrafts: Bool,
         hideOwn: Bool,
         extraRepos: [String] = []
@@ -25,13 +27,14 @@ public struct FilterSettings: Codable, Hashable, Sendable {
         self.organization = organization
         self.repoWatch = repoWatch
         self.newRepoDefault = newRepoDefault
+        self.showDrafts = showDrafts
         self.includeDrafts = includeDrafts
         self.hideOwn = hideOwn
         self.extraRepos = Array(Set(extraRepos.map { $0.lowercased() })).sorted()
     }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, organization, repoWatch, newRepoDefault, includeDrafts, hideOwn, extraRepos
+        case kind, organization, repoWatch, newRepoDefault, showDrafts, includeDrafts, hideOwn, extraRepos
     }
 
     public init(from decoder: any Decoder) throws {
@@ -40,6 +43,9 @@ public struct FilterSettings: Codable, Hashable, Sendable {
         organization = try c.decode(String.self, forKey: .organization)
         (repoWatch, newRepoDefault) = try RepoWatchCoding.decode(from: decoder)
         includeDrafts = try c.decode(Bool.self, forKey: .includeDrafts)
+        // Van vóór `showDrafts` liet `includeDrafts` drafts ook zien: zo blijft de vergelijking
+        // met de vorige instellingen kloppen en haalt de eerste sync de drafts alsnog op.
+        showDrafts = try c.decodeIfPresent(Bool.self, forKey: .showDrafts) ?? includeDrafts
         hideOwn = try c.decode(Bool.self, forKey: .hideOwn)
         extraRepos = try c.decodeIfPresent([String].self, forKey: .extraRepos) ?? []
     }
@@ -50,6 +56,7 @@ public struct FilterSettings: Codable, Hashable, Sendable {
         try c.encode(organization, forKey: .organization)
         try c.encode(repoWatch, forKey: .repoWatch)
         try c.encode(newRepoDefault, forKey: .newRepoDefault)
+        try c.encode(showDrafts, forKey: .showDrafts)
         try c.encode(includeDrafts, forKey: .includeDrafts)
         try c.encode(hideOwn, forKey: .hideOwn)
         if !extraRepos.isEmpty { try c.encode(extraRepos, forKey: .extraRepos) }
@@ -76,11 +83,12 @@ public struct FilterSettings: Codable, Hashable, Sendable {
     }
 
     /// Of een geschiedenis-sync onder `other` dezelfde PR's oplevert: zelfde bron, zelfde
-    /// PR-vinkjes per repo (hoofdletterongevoelig) en standaard, drafts en eigen PR's, en dezelfde
+    /// PR-vinkjes per repo (hoofdletterongevoelig) en standaard, drafts tonen en melden, eigen PR's, en dezelfde
     /// losse repo's (een net toegevoegde heeft zijn geschiedenis nog niet). Tag-vinkjes tellen niet mee.
     func sameSyncScope(as other: FilterSettings) -> Bool {
         sameSource(as: other)
             && newRepoDefault == other.newRepoDefault
+            && showDrafts == other.showDrafts
             && includeDrafts == other.includeDrafts
             && hideOwn == other.hideOwn
             && prOverrides == other.prOverrides
@@ -106,6 +114,7 @@ extension Account {
             organization: owners.joined(separator: ","),
             repoWatch: repoWatch,
             newRepoDefault: newRepoDefault,
+            showDrafts: showDrafts,
             includeDrafts: includeDrafts,
             hideOwn: hideOwn,
             extraRepos: extraRepos

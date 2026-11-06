@@ -144,6 +144,22 @@ import PullwatchTestSupport
         #expect(s.watch(for: "o/api") == .prs)
     }
 
+    /// Van vóór "Draft-PR's tonen": een account toont drafts, en bewaarde instellingen lezen het als
+    /// `includeDrafts`, dat drafts toen ook liet zien. Zo telt de update als wijziging en haalt de
+    /// sync de verborgen drafts op.
+    @Test(arguments: [true, false])
+    func `Settings from before showing drafts read it from including them`(includeDrafts: Bool) throws {
+        let settings = #"{"kind":"gitHub","organization":"o","repoWatch":{},"newRepoDefault":"prs","includeDrafts":\#(includeDrafts),"hideOwn":true}"#
+        let s = try JSONDecoder().decode(FilterSettings.self, from: Data(settings.utf8))
+        #expect(s.showDrafts == includeDrafts)
+
+        let account = #"{"id":"00000000-0000-0000-0000-000000000009","kind":"gitHub","organization":"o","authMethod":"pat","repoWatch":{},"newRepoDefault":"prs","includeDrafts":\#(includeDrafts),"hideOwn":true}"#
+        let a = try JSONDecoder().decode(Account.self, from: Data(account.utf8))
+        #expect(a.showDrafts)
+        let again = try JSONDecoder().decode(Account.self, from: JSONEncoder().encode(a))
+        #expect(again.showDrafts)
+    }
+
     @Test func dedupKeyCombinesAccountRepoAndNumber() {
         let pr = PullRequest.fixture(repo: "proj/api", number: 42)
         #expect(pr.dedupKey == "00000000-0000-0000-0000-000000000001:proj/api:42")

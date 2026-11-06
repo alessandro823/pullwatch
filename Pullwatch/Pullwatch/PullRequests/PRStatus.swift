@@ -1,8 +1,9 @@
 import PullwatchCore
 import SwiftUI
 
-/// De status van een PR zoals GitHub hem toont, met een open draft en een open PR in de rij om
-/// vanzelf te mergen (Queued) apart van een gewone open PR. Bepaalt op één plek het icoon, de
+/// De status van een PR zoals GitHub hem toont, met een open draft en een open PR in een merge
+/// queue of merge train (Queued) apart van een gewone open PR; met alleen auto-merge of
+/// auto-complete aan is hij gewoon open. Bepaalt op één plek het icoon, de
 /// kleur en de tekst.
 nonisolated enum PRStatus: CaseIterable, Hashable, Sendable {
     case open, draft, queued, merged, closed

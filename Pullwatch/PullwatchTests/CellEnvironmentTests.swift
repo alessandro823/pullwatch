@@ -42,6 +42,10 @@ import Testing
         #expect(draws(RepoReferenceLabel(entry: Self.item.entry, kind: kind)))
     }
 
+    @Test func `RepoReferenceLabel without the owner draws without a model in the environment`() {
+        #expect(draws(RepoReferenceLabel(entry: Self.item.entry, kind: .gitHub, showsOwner: false)))
+    }
+
     /// Het In-house-teken staat in de cellen van Afhankelijkheden en van het tabblad Packages, met
     /// en zonder link (een Azure-project zonder repository en zonder pagina).
     @Test(arguments: [

@@ -1,0 +1,1 @@
+- A pull request shows as queued only while it is really in a merge queue (GitHub, Bitbucket Cloud) or merge train (GitLab), as GitHub shows it. With only auto-merge (GitHub, GitLab) or auto-complete (Azure DevOps) on, it stays open until it enters the queue. Agents see the same in the `queued` state.

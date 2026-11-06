@@ -14,6 +14,10 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     public var repoWatch: [String: WatchSet]
     /// Geldt voor repo's die niet in `repoWatch` staan.
     public var newRepoDefault: NewRepoDefault
+    /// Drafts in het menu, de geschiedenis en de meldingen; uit verbergt ze overal tot ze klaar
+    /// zijn voor review. Standaard aan, zoals GitHub ze toont.
+    public var showDrafts: Bool
+    /// Een nieuwe draft geeft een melding ("Draft-PR's melden"); telt alleen met `showDrafts`.
     public var includeDrafts: Bool
     public var hideOwn: Bool
     /// GitHub CLI: welk `gh`-account (login) het token levert; nil = het actieve account.
@@ -224,6 +228,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         login: String? = nil,
         repoWatch: [String: WatchSet] = [:],
         newRepoDefault: NewRepoDefault = .none,
+        showDrafts: Bool = true,
         includeDrafts: Bool = false,
         hideOwn: Bool = true,
         cliUser: String? = nil,
@@ -242,6 +247,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.authMethod = authMethod
         self.repoWatch = repoWatch
         self.newRepoDefault = newRepoDefault
+        self.showDrafts = showDrafts
         self.includeDrafts = includeDrafts
         self.hideOwn = hideOwn
         self.cliUser = cliUser
@@ -254,7 +260,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, displayName, organization, owners, login, authMethod, repoWatch, newRepoDefault, includeDrafts, hideOwn, cliUser, isPaused, instanceURL, extraRepos, email, giteaFlavour, packagesViaCLI
+        case id, kind, displayName, organization, owners, login, authMethod, repoWatch, newRepoDefault, showDrafts, includeDrafts, hideOwn, cliUser, isPaused, instanceURL, extraRepos, email, giteaFlavour, packagesViaCLI
     }
 
     public init(from decoder: any Decoder) throws {
@@ -272,6 +278,8 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         login = try c.decodeIfPresent(String.self, forKey: .login)
         authMethod = try c.decode(AuthMethod.self, forKey: .authMethod)
         (repoWatch, newRepoDefault) = try RepoWatchCoding.decode(from: decoder)
+        // Van vóór de schakelaar: drafts tonen, zoals GitHub.
+        showDrafts = try c.decodeIfPresent(Bool.self, forKey: .showDrafts) ?? true
         includeDrafts = try c.decode(Bool.self, forKey: .includeDrafts)
         hideOwn = try c.decode(Bool.self, forKey: .hideOwn)
         cliUser = try c.decodeIfPresent(String.self, forKey: .cliUser)
@@ -311,6 +319,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         try c.encode(authMethod, forKey: .authMethod)
         try c.encode(repoWatch, forKey: .repoWatch)
         try c.encode(newRepoDefault, forKey: .newRepoDefault)
+        try c.encode(showDrafts, forKey: .showDrafts)
         try c.encode(includeDrafts, forKey: .includeDrafts)
         try c.encode(hideOwn, forKey: .hideOwn)
         try c.encodeIfPresent(cliUser, forKey: .cliUser)

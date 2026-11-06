@@ -215,7 +215,8 @@ import PullwatchTestSupport
         let json = #"{"kind":"gitHub","organization":"octo","repoWatch":{},"newRepoDefault":"prs","includeDrafts":false,"hideOwn":true}"#
         let settings = try JSONDecoder().decode(FilterSettings.self, from: Data(json.utf8))
         #expect(settings.extraRepos.isEmpty)
-        #expect(settings == Account(kind: .gitHub, organization: "octo", authMethod: .cli, newRepoDefault: .prs).filterSettings)
+        // Oude JSON zonder `showDrafts` met `includeDrafts` uit verborg drafts: zo'n account toen.
+        #expect(settings == Account(kind: .gitHub, organization: "octo", authMethod: .cli, newRepoDefault: .prs, showDrafts: false).filterSettings)
     }
 
     @Test func addingAnExtraRepoStartsAFreshHistorySync() {

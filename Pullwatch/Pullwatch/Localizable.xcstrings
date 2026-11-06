@@ -6640,52 +6640,114 @@
         }
       }
     },
-    "Draft-PR's meenemen": {
+    "Draft-PR's melden": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entwurfs-PRs einbeziehen"
+            "value": "Bei Entwurfs-PRs mitteilen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Include draft PRs"
+            "value": "Notify about draft PRs"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inclure les PR brouillons"
+            "value": "Notifier les PR brouillons"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Draft-PR's meenemen"
+            "value": "Draft-PR's melden"
           }
         }
       }
     },
-    "Draft-merge requests meenemen": {
+    "Draft-PR's tonen": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entwurfs-Merge-Requests einbeziehen"
+            "value": "Entwurfs-PRs anzeigen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Include draft merge requests"
+            "value": "Show draft PRs"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inclure les merge requests en brouillon"
+            "value": "Afficher les PR brouillons"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draft-PR's tonen"
+          }
+        }
+      }
+    },
+    "Draft-merge requests melden": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Entwurfs-Merge-Requests mitteilen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notify about draft merge requests"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifier les merge requests en brouillon"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draft-merge requests melden"
+          }
+        }
+      }
+    },
+    "Draft-merge requests tonen": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entwurfs-Merge-Requests anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show draft merge requests"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les merge requests en brouillon"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draft-merge requests tonen"
           }
         }
       }
@@ -8562,28 +8624,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copié"
-          }
-        }
-      }
-    },
-    "Geldt overal: in het menu, de geschiedenis en de meldingen.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gilt überall: im Menü, im Verlauf und in den Mitteilungen."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Applies everywhere: in the menu, the history and notifications."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "S’applique partout : dans le menu, l’historique et les notifications."
           }
         }
       }
@@ -22282,6 +22322,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sans tag"
+          }
+        }
+      }
+    },
+    "Zonder tonen staan drafts nergens en komt een draft binnen zodra hij klaar is voor review. Verbergen geldt overal.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Anzeigen erscheinen Entwürfe nirgends, und ein Entwurf kommt an, sobald er bereit zum Review ist. Ausblenden gilt überall."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without showing, drafts appear nowhere and a draft arrives once it is ready for review. Hiding applies everywhere."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans affichage, les brouillons n’apparaissent nulle part et un brouillon arrive dès qu’il est prêt pour la revue. Masquer s’applique partout."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zonder tonen staan drafts nergens en komt een draft binnen zodra hij klaar is voor review. Verbergen geldt overal."
           }
         }
       }

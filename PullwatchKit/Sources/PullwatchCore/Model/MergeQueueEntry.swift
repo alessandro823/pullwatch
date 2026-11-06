@@ -15,6 +15,16 @@ public struct MergeQueueEntry: Codable, Hashable, Sendable {
         case autoMerge
         /// Azure DevOps: auto-complete staat aan (`autoCompleteSetBy`).
         case autoComplete
+
+        /// Of de PR echt in een rij staat (merge queue, merge train), zoals GitHub en GitLab
+        /// alleen dan het merge-queue-icoon tonen. Auto-merge en auto-complete wachten alleen
+        /// op de checks: de PR is dan nog gewoon open.
+        public var isQueue: Bool {
+            switch self {
+            case .mergeQueue, .mergeTrain: true
+            case .autoMerge, .autoComplete: false
+            }
+        }
     }
 
     public var kind: Kind

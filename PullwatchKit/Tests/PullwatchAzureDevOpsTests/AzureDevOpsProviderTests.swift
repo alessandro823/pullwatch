@@ -16,8 +16,9 @@ import PullwatchTestSupport
         """#
     }
 
-    /// Auto-complete aan (`autoCompleteSetBy`): de PR voltooit vanzelf en staat dus in de rij.
-    @Test func `Auto-complete shows as queued`() async throws {
+    /// Auto-complete aan (`autoCompleteSetBy`): de PR voltooit vanzelf. Pullwatch houdt dat bij
+    /// (voor de melding als het uitgaat), maar het is geen rij: de PR is nog gewoon open.
+    @Test func `Auto-complete is kept but not queued`() async throws {
         let http = MockHTTPClient()
         http.on("_apis/projects", body: projects)
         let autoComplete = #"""
@@ -31,7 +32,7 @@ import PullwatchTestSupport
         let prs = try await makeProvider(http).openPullRequests()
 
         #expect(prs.first { $0.number == 18 }?.mergeQueue == MergeQueueEntry(kind: .autoComplete))
-        #expect(prs.first { $0.number == 18 }?.isQueued == true)
+        #expect(prs.first { $0.number == 18 }?.isQueued == false)
         #expect(prs.first { $0.number == 17 }?.mergeQueue == nil)
     }
 

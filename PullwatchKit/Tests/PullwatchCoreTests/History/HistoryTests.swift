@@ -221,6 +221,18 @@ import PullwatchTestSupport
         #expect(pr.closedAt == closed)
     }
 
+    /// Klaar voor review of weer draft: de geschiedenis volgt, zodat het icoon klopt.
+    @Test(arguments: [true, false])
+    func `Merge updates whether the pull request is a draft`(isDraft: Bool) throws {
+        var history = History()
+        history.add(pullRequests: [.fixture(number: 1, isDraft: !isDraft)], tags: [], at: t0)
+        let changed = history.merge(synced: [.fixture(number: 1, isDraft: isDraft)])
+        #expect(changed)
+        let item = try #require(history.items.first)
+        guard case .pullRequest(let pr) = item.entry else { Issue.record("geen PR"); return }
+        #expect(pr.isDraft == isDraft)
+    }
+
     @Test func mergeUnchangedReturnsFalse() {
         var history = History()
         let synced = [PullRequest.fixture(number: 1, state: .closed, closedAt: t0 + 10)]

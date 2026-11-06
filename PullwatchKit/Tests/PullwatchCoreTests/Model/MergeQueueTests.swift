@@ -21,6 +21,20 @@ import PullwatchTestSupport
         #expect(!PullRequest.fixture().isQueued)
     }
 
+    /// Zoals GitHub: alleen een echte rij toont de PR als queued. Met auto-merge of auto-complete
+    /// aan wacht hij op zijn checks en is hij nog gewoon open, ook al houdt Pullwatch die stand bij.
+    @Test(arguments: [
+        (MergeQueueEntry.Kind.mergeQueue, true),
+        (.mergeTrain, true),
+        (.autoMerge, false),
+        (.autoComplete, false),
+    ])
+    func `Only a merge queue or merge train is queued`(kind: MergeQueueEntry.Kind, isQueued: Bool) {
+        let pr = queued(.fixture(), MergeQueueEntry(kind: kind))
+        #expect(pr.isQueued == isQueued)
+        #expect(pr.mergeQueue?.kind == kind, "de stand blijft voor de melding uit de rij")
+    }
+
     @Test func `History from before the queue still decodes`() throws {
         let json = #"""
             {"accountId":"00000000-0000-0000-0000-000000000001","repo":"proj/api","number":1,"title":"Fix bug",

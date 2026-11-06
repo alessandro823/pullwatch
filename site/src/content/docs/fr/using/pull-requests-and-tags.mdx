@@ -17,9 +17,9 @@ Le numéro est écrit comme le service l’écrit : FerroHEALTH/FerroFED #1570 s
 
 Pour retrouver une pull request, cherchez `1570`, `#1570`, `!42`, `FerroFED#1570` ou `FerroHEALTH/FerroFED#1570`. Un numéro seul trouve aussi les titres qui le contiennent. **Copier la référence** dans le menu Élément (⌥⇧⌘L) place `FerroHEALTH/FerroFED#1570` dans le presse-papiers, prêt pour un message de commit, une issue ou un chat.
 
-Une pull request ouverte qui attend d’être fusionnée automatiquement apparaît en file d’attente, avec une icône orange : dans une merge queue ou avec l’auto-merge sur GitHub, dans la merge queue sur Bitbucket Cloud, dans un merge train ou programmée pour être fusionnée quand le pipeline réussit sur GitLab, ou avec l’auto-complete sur Azure DevOps.
+Une pull request ouverte qui est vraiment dans une file apparaît en file d’attente, avec une icône orange : dans la merge queue sur GitHub ou Bitbucket Cloud, ou dans un merge train sur GitLab. Comme sur GitHub, une pull request avec seulement l’auto-merge (GitHub, GitLab) ou l’auto-complete (Azure DevOps) activé reste ouverte jusqu’à son entrée dans la file.
 
-Dans la barre latérale, vous pouvez déplier **PR**, **Tags et versions publiées** et **Dépôts** en leurs projets (Azure DevOps) ou leurs propriétaires (GitHub et GitLab), chacun avec son propre nombre de non-lus. En sélectionner un filtre la liste et la recherche sur celui-ci. Les badges comptent ce qui n’est pas lu.
+Dans la barre latérale, vous pouvez déplier **PR**, **Tags et versions publiées** et **Dépôts** en leurs projets (Azure DevOps) ou leurs propriétaires (GitHub et GitLab), chacun avec son propre nombre de non-lus. En sélectionner un filtre la liste et la recherche sur celui-ci, et la colonne Dépôt omet alors ce nom : FerroFED #1570 au lieu de FerroHEALTH/FerroFED #1570. Les badges comptent ce qui n’est pas lu.
 
 Quand vous ajoutez un compte, Pullwatch récupère ses pull requests existantes (ouvertes, fusionnées et fermées), aussi loin que remonte l’historique et 1000 au maximum par compte. Elles ne déclenchent pas de notification et arrivent marquées comme lues. Ensuite, l’historique est mis à jour toutes les 15 minutes : état, titre et date de fermeture. Changer les dépôts qu’un compte suit, ou la durée de conservation de l’historique, relance cette première récupération pour ce compte.
 
