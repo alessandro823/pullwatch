@@ -30,6 +30,16 @@ import Testing
         #expect(exists(kind.glyph))
     }
 
+    /// Het icoon van elk onderdeel in de zijbalk bestaat; Branches is de Octicon git-branch.
+    @Test(arguments: MainSection.allCases)
+    func sectionSymbolsExist(_ section: MainSection) {
+        #expect(exists(section.glyph))
+    }
+
+    @Test func branchesUseTheGitBranchOcticon() {
+        #expect(MainSection.branches.glyph == .asset("branch"))
+    }
+
     @Test(arguments: ProviderKind.allCases)
     func providerMarksExist(_ kind: ProviderKind) {
         #expect(exists(kind.glyph))

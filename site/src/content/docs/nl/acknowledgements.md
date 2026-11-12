@@ -12,7 +12,7 @@ Pullwatch is gratis en open source onder de [Apache License 2.0](https://github.
 | [SwiftLog](https://github.com/apple/swift-log) | 1.17.0 | Apache 2.0 | Logging in de MCP Swift SDK |
 | [Swift System](https://github.com/apple/swift-system) | 1.8.1 | Apache 2.0 with the Runtime Library Exception | Systeemaanroepen in de MCP Swift SDK |
 | [EventSource](https://github.com/mattt/eventsource) | 1.6.0 | MIT | Server-sent events in de MCP Swift SDK |
-| [GitHub Octicons](https://github.com/primer/octicons) | 19.41.0 | MIT | De symbolen voor pull requests en checks, het icoon in de menubalk en het teken in het app-icoon |
+| [GitHub Octicons](https://github.com/primer/octicons) | 19.41.0 | MIT | De symbolen voor pull requests, checks en Branches, het icoon in de menubalk en het teken in het app-icoon |
 | [Codeberg-logo](https://codeberg.org/Codeberg/Design) | 9f8c699 | CC0 1.0 | Het teken van een Codeberg-account |
 | [Forgejo-logo](https://codeberg.org/forgejo/meta/src/branch/readme/branding) van Caesar Schinas | e34fea4 | CC BY-SA 4.0 | Het teken van een Forgejo-account |
 | [simple-icons-swift](https://github.com/Vernum-Projecten/simple-icons-swift) | 16.36.2 | MIT | Het tekenen van de logo's van ecosystemen in Packages |

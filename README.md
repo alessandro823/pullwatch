@@ -155,8 +155,8 @@ Pullwatch is licensed under the [Apache License 2.0](LICENSE).
 
 ## Trademarks and third-party
 
-- The pull request, checks and menu bar icons and the glyph of the app icon
-  are [GitHub Octicons](https://github.com/primer/octicons), MIT License.
+- The pull request, checks, Branches and menu bar icons and the glyph of the
+  app icon are [GitHub Octicons](https://github.com/primer/octicons), MIT License.
 - GitHub and the Invertocat are trademarks of GitHub, Inc. Pullwatch shows
   the unmodified Invertocat from GitHub's
   [logo download](https://brand.github.com/GitHub_Logos.zip) where an

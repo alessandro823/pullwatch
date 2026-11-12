@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg
+PUBLIC "-//W3C//DTD SVG 1.1//EN"
+       "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+ <!--glyph: "git-branch", point size: 100.0, template writer version: "101"-->
+ <!--Octicon git-branch, (c) GitHub Inc., MIT-licentie; zie NOTICE.-->
+ <style>.monochrome-0 {fill:#000000}
+.multicolor-0:tintColor {fill:#007AFF}
+.hierarchical-0:primary {fill:#212121}
+</style>
+ <g id="Notes">
+  <text id="template-version" style="stroke:none;fill:black;font-family:sans-serif;font-size:13;text-anchor:end;" transform="matrix(1 0 0 1 3036 1933)">Template v.4.0</text>
+  <text id="descriptive-name" style="stroke:none;fill:black;font-family:sans-serif;font-size:13;" transform="matrix(1 0 0 1 263 1953)">git-branch</text>
+ </g>
+ <g id="Guides">
+  <line id="Baseline-S" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="696" y2="696"/>
+  <line id="Capline-S" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="625.541" y2="625.541"/>
+  <line id="Baseline-M" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1126" y2="1126"/>
+  <line id="Capline-M" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1055.541" y2="1055.541"/>
+  <line id="Baseline-L" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1556" y2="1556"/>
+  <line id="Capline-L" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1485.541" y2="1485.541"/>
+  <line id="left-margin-Ultralight-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="518.111" x2="518.111" y1="600.785" y2="720.121"/>
+  <line id="right-margin-Ultralight-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="601.311" x2="601.311" y1="600.785" y2="720.121"/>
+  <line id="left-margin-Regular-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="1408.240" x2="1408.240" y1="600.785" y2="720.121"/>
+  <line id="right-margin-Regular-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="1491.440" x2="1491.440" y1="600.785" y2="720.121"/>
+  <line id="left-margin-Black-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="2891.800" x2="2891.800" y1="600.785" y2="720.121"/>
+  <line id="right-margin-Black-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="2975.000" x2="2975.000" y1="600.785" y2="720.121"/>
+ </g>
+ <g id="Symbols">
+  <g id="Ultralight-S" transform="matrix(1 0 0 1 518.111 696)">
+   <path class="monochrome-0 multicolor-0:tintColor hierarchical-0:primary" d="M49.4 -59.9295a11.7 11.7 0 1 1 15.6 11.0344V-45.6295A13 13 0 0 1 52 -32.6295H31.2a5.2 5.2 0 0 0 -5.2 5.2v5.8656a11.7052 11.7052 0 1 1 -7.8 0V-48.8951a11.7 11.7 0 1 1 7.8 0v9.5472A12.9636 12.9636 0 0 1 31.2 -40.4295h20.8a5.2 5.2 0 0 0 5.2 -5.2v-3.2656A11.7 11.7 0 0 1 49.4 -59.9295Zm-31.2 0a3.9 3.9 0 1 0 7.8 0a3.9 3.9 0 0 0 -7.8 0Zm42.9 -3.9a3.9 3.9 0 1 0 0 7.8a3.9 3.9 0 0 0 0 -7.8ZM22.1 -14.4295a3.9 3.9 0 1 0 0 7.8a3.9 3.9 0 0 0 0 -7.8Z"/>
+  </g>
+  <g id="Regular-S" transform="matrix(1 0 0 1 1408.240 696)">
+   <path class="monochrome-0 multicolor-0:tintColor hierarchical-0:primary" d="M49.4 -59.9295a11.7 11.7 0 1 1 15.6 11.0344V-45.6295A13 13 0 0 1 52 -32.6295H31.2a5.2 5.2 0 0 0 -5.2 5.2v5.8656a11.7052 11.7052 0 1 1 -7.8 0V-48.8951a11.7 11.7 0 1 1 7.8 0v9.5472A12.9636 12.9636 0 0 1 31.2 -40.4295h20.8a5.2 5.2 0 0 0 5.2 -5.2v-3.2656A11.7 11.7 0 0 1 49.4 -59.9295Zm-31.2 0a3.9 3.9 0 1 0 7.8 0a3.9 3.9 0 0 0 -7.8 0Zm42.9 -3.9a3.9 3.9 0 1 0 0 7.8a3.9 3.9 0 0 0 0 -7.8ZM22.1 -14.4295a3.9 3.9 0 1 0 0 7.8a3.9 3.9 0 0 0 0 -7.8Z"/>
+  </g>
+  <g id="Black-S" transform="matrix(1 0 0 1 2891.800 696)">
+   <path class="monochrome-0 multicolor-0:tintColor hierarchical-0:primary" d="M49.4 -59.9295a11.7 11.7 0 1 1 15.6 11.0344V-45.6295A13 13 0 0 1 52 -32.6295H31.2a5.2 5.2 0 0 0 -5.2 5.2v5.8656a11.7052 11.7052 0 1 1 -7.8 0V-48.8951a11.7 11.7 0 1 1 7.8 0v9.5472A12.9636 12.9636 0 0 1 31.2 -40.4295h20.8a5.2 5.2 0 0 0 5.2 -5.2v-3.2656A11.7 11.7 0 0 1 49.4 -59.9295Zm-31.2 0a3.9 3.9 0 1 0 7.8 0a3.9 3.9 0 0 0 -7.8 0Zm42.9 -3.9a3.9 3.9 0 1 0 0 7.8a3.9 3.9 0 0 0 0 -7.8ZM22.1 -14.4295a3.9 3.9 0 1 0 0 7.8a3.9 3.9 0 0 0 0 -7.8Z"/>
+  </g>
+ </g>
+</svg>
