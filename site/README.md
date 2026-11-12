@@ -64,6 +64,10 @@ no middle dots.
   JSON-LD: a `SoftwareApplication` on each landing page (version from
   `Pullwatch/App.xcconfig`) and a `FAQPage` from the `##` questions of each
   FAQ page.
+- After each deploy, `site.yml` sends every URL in the sitemap to IndexNow
+  (Bing, Yandex, Seznam, Naver). The key is the file
+  `public/2d23b6c65e81c2975e13d39327232aa3.txt`; a new key means a new file
+  and the same value in `site.yml`.
 - Each landing page sets its own `<title>`, `og:title` and `og:type` in its
   front matter `head`; every other page gets `<title>` and the description
   from its front matter.

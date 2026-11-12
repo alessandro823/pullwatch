@@ -126,3 +126,22 @@ jobs:
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      # IndexNow tells Bing, Yandex, Seznam and Naver which pages changed, so
+      # they crawl them now instead of some day. The key is the file
+      # site/public/<key>.txt; a failure here never fails the deploy.
+      - name: tell search engines through IndexNow
+        if: ${{ vars.PAGES_DOMAIN != '' }}
+        continue-on-error: true
+        env:
+          DOMAIN: ${{ vars.PAGES_DOMAIN }}
+          KEY: 2d23b6c65e81c2975e13d39327232aa3
+        run: |
+          sleep 30
+          urls=$(curl -fsSL "https://$DOMAIN/sitemap-index.xml" \
+            | grep -o '<loc>[^<]*' | sed 's/<loc>//' \
+            | while read -r sitemap; do curl -fsSL "$sitemap"; done \
+            | grep -o '<loc>[^<]*' | sed 's/<loc>//' | jq -R . | jq -s .)
+          jq -n --arg host "$DOMAIN" --arg key "$KEY" --argjson urls "$urls" \
+            '{host: $host, key: $key, keyLocation: "https://\($host)/\($key).txt", urlList: $urls}' \
+            | curl -fsS -o /dev/null -w 'IndexNow: HTTP %{http_code}\n' -X POST https://api.indexnow.org/indexnow \
+              -H 'Content-Type: application/json; charset=utf-8' --data-binary @-
