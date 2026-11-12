@@ -1,0 +1,1 @@
+- The Branches section shows GitHub's git-branch icon, as on GitHub.
