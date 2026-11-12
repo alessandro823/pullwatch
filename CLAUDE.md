@@ -11,20 +11,21 @@ of each part is in `docs/superpowers/specs/` and its plan in
 
 ## Where the work happens
 
-- `upstream` = `alessandro823/pullwatch`, Alessandro's repository and the
-  source of truth. We have read access only.
-- `origin` = `Vernum-Projecten/pullwatch`, our fork. Branches, issues,
-  their relations and pull requests all live here: each change merges into
-  the fork's `main` through a pull request in the fork
-  (`gh pr create --repo Vernum-Projecten/pullwatch --base main`).
-- **No pull request goes to upstream until all our work is done.** Then the
-  fork's `main` goes to Alessandro as one combined pull request. Never open
-  a pull request against `alessandro823/pullwatch` before the owner says so.
+- `origin` = `alessandro823/pullwatch`, Alessandro's repository and the
+  source of truth. We are collaborators with push access: every change goes
+  there on its own branch and reaches `main` through a pull request
+  (`gh pr create --repo alessandro823/pullwatch --base main`).
+- **Never push to `main`, and never merge a pull request.** Alessandro
+  reviews and merges each one himself; we open it and wait.
+- `fork` = `Vernum-Projecten/pullwatch`, our fork. It keeps the tracker
+  (issues and their relations, with the organisation's issue fields) and
+  follows `origin/main` (`git push fork origin/main:main` after a fetch).
+  A pull request links its issue as `Vernum-Projecten/pullwatch#<n>`.
 - `gh repo set-default Vernum-Projecten/pullwatch` once per clone, so `gh`
-  and `scripts/gh/*` act on the fork, not on upstream.
-- When Alessandro pushes new work: `git fetch upstream`, then merge
-  `upstream/main` into the fork's `main` through a pull request in the fork,
-  so the final pull request stays mergeable.
+  and `scripts/gh/*` act on the tracker; pass `--repo
+  alessandro823/pullwatch` to every `gh pr` command.
+- A new clone: `git clone https://github.com/alessandro823/pullwatch.git`,
+  then `git remote add fork https://github.com/Vernum-Projecten/pullwatch.git`.
 
 ## Repository map
 
@@ -360,8 +361,10 @@ of each part is in `docs/superpowers/specs/` and its plan in
 
 ## Hard rules
 
-- **Never push to upstream.** Push to `origin` and open a pull request in
-  the fork; the Claude Bash hook refuses a push to upstream.
+- **Never push to `main` or merge a pull request.** Push a branch to
+  `origin` and open a pull request in `alessandro823/pullwatch`; Alessandro
+  merges. The Claude Bash hook refuses a push to `main`, `gh pr merge` and a
+  pull request opened anywhere else.
 - **No secrets in the tree.** Tokens live in the Keychain; the Developer ID
   certificate, the notarisation credentials and Sparkle's private
   key are Alessandro's and live in Actions secrets and his Keychain. The
@@ -447,11 +450,12 @@ exactly one work-kind label (`documentation`, `chore`, `refactor`, `perf`,
 (`scripts/gh/rel.sh parent <child> <epic>`); order is `rel.sh blocked-by`.
 Read an issue with `gh issue view <n> --json title,body,comments`.
 
-A change lands in the fork's `main` through a PR in the fork, on a
-conventional-type branch (a Bug is `fix/`,
+A change lands in `alessandro823/pullwatch`'s `main` through a PR there,
+merged by Alessandro, on a conventional-type branch (a Bug is `fix/`,
 a Feature `feat/`, a Task its work kind), with conventional commit subjects
-in English (`feat: …`, `fix: …`), as upstream's history does. The PR body
-says what changed and why, and links the fork issue. Prefer what
+in English (`feat: …`, `fix: …`), as the history does. The PR body
+says what changed and why, and links the fork issue
+(`Vernum-Projecten/pullwatch#<n>`). Prefer what
 FerroLICENCE (`~/RustroverProjects/FerroLICENCE`) already does and has
 proven (icon, DMG window, Sparkle updater, CI, release lane) over designing
 it again; each issue lists the files to copy.

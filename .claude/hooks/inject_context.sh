@@ -11,7 +11,7 @@ cd "$root" || exit 0
 
 echo "=== Pullwatch: read CLAUDE.md first ==="
 echo
-echo "=== remotes (origin = our fork, upstream = Alessandro's repository) ==="
+echo "=== remotes (origin = Alessandro's repository, where pull requests go; fork = ours, the tracker) ==="
 git remote -v 2>/dev/null | awk '$3 == "(fetch)" { print $1 "  " $2 }'
 echo
 echo "=== open issues (tracker: $(gh repo set-default --view 2>/dev/null || echo 'no default set')) ==="
