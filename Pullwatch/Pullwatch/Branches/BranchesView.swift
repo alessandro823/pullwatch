@@ -2,8 +2,9 @@ import PullwatchCore
 import SwiftUI
 
 /// Het onderdeel Branches: de pushes naar branches van de repo's die je volgt, nieuwste eerst, in
-/// een tabel zoals die van PR's en Tags. Zoeken, filters op repo en persoon en "Alleen anderen" in
-/// de knoppenbalk; dubbelklik opent de vergelijking (of de branch) in de browser.
+/// een tabel zoals die van PR's en Tags. Laad opnieuw, zoeken, filters op repo en persoon en
+/// "Alleen anderen" in de knoppenbalk, en wanneer de branches gecheckt zijn als ondertitel;
+/// dubbelklik opent de vergelijking (of de branch) in de browser.
 struct BranchesView: View {
     /// Het symbool van het onderdeel in de zijbalk en de lege staat: de Octicon git-branch, zoals
     /// GitHub branches toont (`branch.symbolset`, zie NOTICE).
@@ -11,6 +12,7 @@ struct BranchesView: View {
 
     @Environment(BranchesModel.self) private var branches
     @Environment(AppRouter.self) private var router
+    @Environment(PollingModel.self) private var polling
 
     @State private var filter = BranchFilter()
     @State private var selection: BranchPush.ID?
@@ -69,7 +71,17 @@ struct BranchesView: View {
         .searchable(text: $filter.searchText, prompt: Text("Zoek op branch, repo of persoon…"))
         .searchShortcut()
         .navigationTitle(Text("Branches"))
+        .navigationSubtitle(CheckedSubtitle.text(polling.branchesCheckedAt))
         .toolbar {
+            ToolbarItem {
+                Button {
+                    polling.refresh()
+                } label: {
+                    Label("Laad opnieuw", systemImage: "arrow.clockwise")
+                }
+                .disabled(polling.isRefreshing)
+                .help("Haal de branches nu op")
+            }
             ToolbarItem {
                 BranchFilterMenu(
                     title: "Repo", allTitle: "Alle repo's", systemImage: "folder", values: repos, selection: $filter.repo

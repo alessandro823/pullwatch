@@ -193,6 +193,7 @@ extension PollEngine {
             return []
         }
         scheduleBranches(of: account, at: t, rateLimitedUntil: nil)
+        lastBranchCheckAt = max(lastBranchCheckAt ?? t, t)
         let wanted = Set(outcome.repos.map { $0.lowercased() })
         forgetBranchHeads(of: account, except: wanted)
         guard let fetch = outcome.fetch else { return [] }

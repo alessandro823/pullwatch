@@ -1,0 +1,1 @@
+- The Branches section has a Reload button that fetches the branches right away, and shows when they were last checked.
