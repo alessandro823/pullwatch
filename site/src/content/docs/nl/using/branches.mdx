@@ -1,32 +1,48 @@
 ---
 title: Branches
-description: Welke branches van je gevolgde repositories pushes kregen, van wie en wanneer.
+description: Welke branches je gevolgde repositories hebben, als boom vanaf de standaardbranch: wie het laatst pushte en hoe ver elke branch afstaat van waar hij vandaan komt.
 ---
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-**Branches** in de zijbalk (⌘3) toont pushes naar de branches van de repositories die je volgt, nieuwste eerst. Het beantwoordt een vraag die de lijsten PR's en Tags niet kunnen beantwoorden: wie werkt waaraan, voordat er een pull request of tag is.
+**Branches** in de zijbalk (⌘3) toont de branches van de repositories die je volgt als boom: per repository bovenaan de standaardbranch, en elke andere branch onder de branch waar hij van gemaakt is. Het beantwoordt een vraag die de lijsten PR's en Tags niet kunnen beantwoorden: wie werkt waaraan, voordat er een pull request of tag is.
 
-<Screenshot name="branches" alt="Het onderdeel Branches: pushes naar branches van drie repositories, elk met branchnaam, repo, auteur, het aantal nieuwe commits en het tijdstip van de push." />
+<Screenshot name="branches" alt="Het onderdeel Branches: per repository een boom vanaf main, met een gestapelde branch onder de branch waar hij van gemaakt is, wie het laatst pushte, hoe ver elke branch voor en achter ligt, en het inspectievenster van de gekozen branch." />
 
-## Wat een rij toont
+## De boom
 
-Elke rij heeft de branch, de repo, wie er pushte (met foto), de commits en wanneer. De kolom Commits zegt wat er gebeurde:
+Elke repository is een groep die je met een klik op de naam dichtklapt; ernaast staat hoeveel branches vandaag een push kregen. Daaronder:
 
-- `+3`: drie nieuwe commits sinds Pullwatch voor het laatst keek.
-- **Force-push**: de branch is herschreven, dus de geschiedenis sluit niet meer aan op die van eerder.
-- **Nieuwe branch**: de branch bestond nog niet.
-- Geen label: de laatste commit van een branch die de afgelopen 14 dagen bewoog. Zo vult Pullwatch de lijst de eerste keer dat het een repository leest, zodat het onderdeel niet leeg begint.
+- De standaardbranch, met **standaard** erbij.
+- Elke branch onder de branch waar hij van gemaakt is, zo diep als nodig. De recentste push staat bovenaan.
+- **Wie**: wie het laatst pushte, met foto. Klik op een naam om alleen diens branches te zien.
+- **Voor / achter**: ↑3 ↓1 betekent drie commits die de ouder niet heeft, en één commit van de ouder die deze branch nog niet heeft.
+- **Laatste push**, met een stip als die in het afgelopen uur was.
+- Een pill met het nummer van een open pull request, en **Nieuwe branch** of **Force-push** als dat de afgelopen dag gebeurde.
 
-Pullwatch ziet wat er tussen twee keer lezen veranderde, niet elke losse push. Drie pushes tussen twee keer lezen zijn één rij met alle nieuwe commits.
+## Hoe Pullwatch weet waar een branch vandaan komt
+
+Git en de diensten houden niet bij van welke branch een branch gemaakt is. Pullwatch zoekt het uit in deze volgorde:
+
+1. De doelbranch van een open pull request vanaf de branch.
+2. Anders de geschiedenis: de branch waar hij de minste commits voor ligt, zoals Git het zelf voorstelt.
+3. Anders de standaardbranch.
+
+Het inspectievenster zegt welke van de drie het werd. Het uitzoeken kost een paar verzoeken per nieuwe branch, dus bij een repository met veel nieuwe branches duurt het soms een paar keer lezen voordat alles op zijn plek staat; tot dan hangt zo'n branch onder de standaardbranch.
+
+## Het inspectievenster
+
+Kies een branch om hem rechts te zien: het pad vanaf de standaardbranch, **Vergelijk met ouder** (de vergelijking bij de dienst), **Open in browser** en **Kopieer branchnaam**. Daaronder **Gemaakt van** met hoe Pullwatch dat weet, hoe ver de branch van zijn ouder en van de standaardbranch afstaat, zijn pull request en de laatste push. **Activiteit** toont de pushes die Pullwatch zag; elke push opent zijn vergelijking.
+
+Pullwatch ziet wat er tussen twee keer lezen veranderde, niet elke losse push. Drie pushes tussen twee keer lezen zijn één regel met alle nieuwe commits.
 
 ## Zoeken en filters
 
-Zoek op branch, repo of persoon. De knoppenbalk filtert op een repo of een persoon, en een klik op een naam in de tabel filtert ook op die persoon. **Alleen anderen** verbergt je eigen pushes.
+Zoek op branch, repository of persoon. De knoppenbalk filtert op een repository of een persoon; **Alleen anderen** verbergt de branches waar jij het laatst op pushte. Een branch die gevonden wordt houdt de branches erboven, zodat je blijft zien waar hij hangt.
+
+**Verwijderde branches** toont ook branches die gemerged of weggehaald zijn, gedimd en doorgestreept, zolang de geschiedenis bewaard wordt. **Laad opnieuw** leest de branches meteen; de ondertitel zegt wanneer ze het laatst gecheckt zijn.
 
 Pullwatch herkent je eigen pushes aan je account op GitHub, en op Bitbucket en Gitea waar het account aan de persoon gekoppeld is. Anders vergelijkt het de naam en het e-mailadres van de auteur met de jouwe.
-
-Dubbelklik op een rij (of kies **Open in browser** in het contextmenu) om de vergelijking bij de dienst te openen. Pullwatch toont zelf geen commits of bestanden.
 
 ## Geen meldingen
 

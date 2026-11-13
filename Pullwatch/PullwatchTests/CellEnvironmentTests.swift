@@ -46,9 +46,28 @@ import Testing
         #expect(draws(RepoReferenceLabel(entry: Self.item.entry, kind: .gitHub, showsOwner: false)))
     }
 
-    @Test(arguments: [BranchPush.Kind.push, .forcePush, .newBranch, .recent])
-    func `BranchKindLabel draws without a model in the environment`(kind: BranchPush.Kind) {
-        #expect(draws(BranchKindLabel(kind: kind, commits: 4)))
+    private static let branch = BranchInfo(
+        name: "feature/x", sha: "abc", authorName: "mona", lastPushAt: Date(timeIntervalSince1970: 1_790_000_000),
+        webURL: URL(string: "https://github.com/octo/app/tree/feature/x")!, parent: "main", parentSource: .history,
+        againstParent: BranchComparison(ahead: 3, behind: 1), pullRequest: 7)
+
+    private static func row(_ kind: BranchRow.Kind, recentKind: BranchPush.Kind? = nil) -> BranchRow {
+        BranchRow(id: "r/x", treeId: "r", accountId: UUID(), repo: "octo/app", kind: kind, depth: 1, isDefault: false, recentKind: recentKind)
+    }
+
+    @Test(arguments: [BranchPush.Kind.newBranch, .forcePush, nil] as [BranchPush.Kind?])
+    func `BranchNameCell of a branch draws without a model in the environment`(recentKind: BranchPush.Kind?) {
+        #expect(draws(BranchNameCell(row: Self.row(.branch(Self.branch), recentKind: recentKind)) {}))
+    }
+
+    @Test(arguments: [true, false])
+    func `BranchNameCell of a repository draws without a model in the environment`(isCollapsed: Bool) {
+        #expect(draws(BranchNameCell(row: Self.row(.repo(activeToday: 2, isCollapsed: isCollapsed))) {}))
+    }
+
+    @Test(arguments: [BranchComparison(ahead: 3, behind: 1), nil] as [BranchComparison?])
+    func `BranchDistanceLabel draws without a model in the environment`(comparison: BranchComparison?) {
+        #expect(draws(BranchDistanceLabel(comparison: comparison)))
     }
 
     @Test(arguments: [URL(string: "https://avatars.example.com/u/1"), nil])

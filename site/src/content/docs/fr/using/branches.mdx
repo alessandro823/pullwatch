@@ -1,32 +1,48 @@
 ---
 title: Branches
-description: Quelles branches de vos dépôts suivis ont reçu des pushs, de qui et quand.
+description: Les branches des dépôts que vous suivez, en arbre depuis la branche par défaut : qui a poussé en dernier et à quelle distance chaque branche se trouve de son origine.
 ---
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-**Branches** dans la barre latérale (⌘3) montre les pushs vers les branches des dépôts que vous suivez, du plus récent au plus ancien. La section répond à une question que les listes PRs et Tags ne couvrent pas : qui travaille sur quoi, avant qu'il y ait une pull request ou un tag.
+**Branches** dans la barre latérale (⌘3) montre les branches des dépôts que vous suivez sous forme d'arbre : pour chaque dépôt, la branche par défaut en haut, et chaque autre branche sous la branche à partir de laquelle elle a été créée. La section répond à une question que les listes PRs et Tags ne couvrent pas : qui travaille sur quoi, avant qu'il y ait une pull request ou un tag.
 
-<Screenshot name="branches" alt="La section Branches : pushs vers des branches de trois dépôts, chacun avec le nom de la branche, le dépôt, l'auteur, le nombre de nouveaux commits et l'heure du push." />
+<Screenshot name="branches" alt="La section Branches : pour chaque dépôt un arbre depuis main, avec une branche empilée sous sa branche d'origine, la dernière personne qui a poussé, l'avance et le retard de chaque branche, et l'inspecteur de la branche choisie." />
 
-## Ce que montre une ligne
+## L'arbre
 
-Chaque ligne a la branche, le dépôt, qui a poussé (avec sa photo), les commits et quand. La colonne Commits dit ce qui s'est passé :
+Chaque dépôt est un groupe que vous repliez d'un clic sur son nom ; à côté, le nombre de branches qui ont reçu un push aujourd'hui. Dessous :
 
-- `+3` : trois nouveaux commits depuis la dernière lecture de Pullwatch.
-- **Force push** : la branche a été réécrite, son historique ne prolonge donc plus l'ancien.
-- **Nouvelle branche** : la branche n'existait pas encore.
-- Sans étiquette : le dernier commit d'une branche qui a bougé ces 14 derniers jours. Pullwatch remplit ainsi la liste à la première lecture d'un dépôt, pour que la section ne commence pas vide.
+- La branche par défaut, marquée **par défaut**.
+- Chaque branche sous la branche à partir de laquelle elle a été créée, sur autant de niveaux que nécessaire. Le push le plus récent vient en premier.
+- **Qui** : la dernière personne qui a poussé, avec sa photo. Cliquez sur un nom pour ne voir que ses branches.
+- **Avance / Retard** : ↑3 ↓1 signifie trois commits que l'origine n'a pas, et un commit de l'origine que cette branche n'a pas encore.
+- **Dernier push**, avec un point s'il date de la dernière heure.
+- Une pastille avec le numéro d'une pull request ouverte, et **Nouvelle branche** ou **Force push** si c'est arrivé dans la journée.
 
-Pullwatch voit ce qui a changé entre deux lectures, pas chaque push séparément. Trois pushs entre deux lectures font une seule ligne avec tous les nouveaux commits.
+## Comment Pullwatch sait d'où vient une branche
+
+Git et les services n'enregistrent pas à partir de quelle branche une branche a été créée. Pullwatch le déduit dans cet ordre :
+
+1. La branche cible d'une pull request ouverte depuis cette branche.
+2. Sinon l'historique : la branche dont elle a le moins de commits d'avance, comme Git le propose lui-même.
+3. Sinon la branche par défaut.
+
+L'inspecteur indique laquelle des trois s'applique. Cela demande quelques requêtes par nouvelle branche ; un dépôt avec beaucoup de nouvelles branches peut donc demander quelques lectures avant que tout soit à sa place, et d'ici là une telle branche reste sous la branche par défaut.
+
+## L'inspecteur
+
+Choisissez une branche pour la voir à droite : le chemin depuis la branche par défaut, **Comparer avec l'origine** (la comparaison chez le service), **Ouvrir dans le navigateur** et **Copier le nom de la branche**. En dessous, **Créée à partir de** avec la façon dont Pullwatch le sait, la distance de la branche à son origine et à la branche par défaut, sa pull request et le dernier push. **Activité** liste les pushs que Pullwatch a vus ; chacun ouvre sa comparaison.
+
+Pullwatch voit ce qui a changé entre deux lectures, pas chaque push séparé. Trois pushs entre deux lectures font une seule entrée avec tous les nouveaux commits.
 
 ## Recherche et filtres
 
-Cherchez par branche, dépôt ou personne. La barre d'outils filtre sur un dépôt ou une personne, et un clic sur un nom dans le tableau filtre aussi sur cette personne. **Seulement les autres** masque vos propres pushs.
+Cherchez par branche, dépôt ou personne. La barre d'outils filtre sur un dépôt ou une personne ; **Seulement les autres** masque les branches où vous avez poussé en dernier. Une branche trouvée garde les branches au-dessus d'elle, pour que vous voyiez où elle se place.
 
-Pullwatch reconnaît vos propres pushs à votre compte sur GitHub, et sur Bitbucket et Gitea là où le compte est lié à la personne. Sinon il compare le nom et l'adresse e-mail de l'auteur aux vôtres.
+**Branches supprimées** montre aussi les branches fusionnées ou supprimées, estompées et barrées, tant que l'historique est conservé. **Recharger** lit les branches tout de suite ; le sous-titre indique quand elles ont été vérifiées pour la dernière fois.
 
-Double-cliquez sur une ligne (ou choisissez **Ouvrir dans le navigateur** dans le menu contextuel) pour ouvrir la comparaison sur le service. Pullwatch n'affiche lui-même ni commits ni fichiers.
+Pullwatch reconnaît vos propres pushs grâce à votre compte sur GitHub, et sur Bitbucket et Gitea quand le compte est lié à la personne. Sinon il compare le nom et l'adresse e-mail de l'auteur avec les vôtres.
 
 ## Pas de notifications
 

@@ -38,9 +38,10 @@ known vulnerabilities. It speaks English, Dutch, German and French.
   queue or merge train.
 - **Tags and releases**: new tags and the releases of GitHub, GitLab,
   Codeberg, Forgejo and Gitea, per repository, with who made them.
-- **Branches**: pushes to the branches of the repositories you follow, by
-  whom and when, before there is a pull request or a tag; a list to look
-  at, without notifications.
+- **Branches**: the branches of the repositories you follow as a tree
+  from the default branch, each under the branch it was made from, with
+  who pushed last and how far it is ahead and behind; a list to look at,
+  without notifications.
 - **History and statistics**: every pull request and tag in a searchable
   list, and charts of opened and merged pull requests per author and
   repository.

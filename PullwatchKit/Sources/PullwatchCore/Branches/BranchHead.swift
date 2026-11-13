@@ -58,7 +58,7 @@ public struct BranchFetch: Equatable, Sendable {
 }
 
 /// Hoeveel commits een branch voor of achter ligt op een andere.
-public struct BranchComparison: Codable, Equatable, Sendable {
+public struct BranchComparison: Codable, Hashable, Sendable {
     public let ahead: Int
     public let behind: Int
 

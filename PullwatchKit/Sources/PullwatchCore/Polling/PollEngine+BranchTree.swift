@@ -139,6 +139,7 @@ extension PollEngine {
                     tree.branches[name]?.againstParent = comparison
                     tree.branches[name]?.comparedParent = key
                 }
+                tree.branches[name]?.parentCompareURL = provider.compareURL(in: repo, from: parentSha, to: info.sha)
             }
             if let defaultSha {
                 let key = "\(defaultSha)...\(info.sha)"

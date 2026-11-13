@@ -112,6 +112,11 @@ nonisolated enum FakeWorld {
         let author: String
         let daysAgo: Double
         var authorLogin = true
+        /// Waar de branch van gemaakt is; nil is main (en niets voor main zelf).
+        var parent: String?
+        /// Eigen commits sinds het aftakken, en hoeveel commits main sindsdien kreeg.
+        var commits = 2
+        var mainMoved = 0
     }
 
     // Per repo een paar branches die de afgelopen 14 dagen bewogen (rijen in Branches na het
@@ -120,22 +125,56 @@ nonisolated enum FakeWorld {
         "hello-world": [
             FakeBranch(name: "main", author: "hubot", daysAgo: 3.5),
             FakeBranch(name: "dependabot/npm_and_yarn/lodash-4.17.21", author: "dependabot[bot]", daysAgo: 0.2),
-            FakeBranch(name: "feature/dark-theme", author: "jdoe", daysAgo: 0.4),
-            FakeBranch(name: "dutch-greeting", author: "mona", daysAgo: 1),
+            FakeBranch(name: "feature/dark-theme", author: "jdoe", daysAgo: 0.4, commits: 3, mainMoved: 1),
+            FakeBranch(name: "feature/dark-icons", author: "jdoe", daysAgo: 0.03, parent: "feature/dark-theme", commits: 2),
+            FakeBranch(name: "dutch-greeting", author: "mona", daysAgo: 1, mainMoved: 7),
             FakeBranch(name: "experiment/second-greeting", author: "jdoe", daysAgo: 40),
         ],
         "spoon-knife": [
             FakeBranch(name: "main", author: "jdoe", daysAgo: 6),
-            FakeBranch(name: "update-express", author: "hubot", daysAgo: 0.5),
+            FakeBranch(name: "update-express", author: "hubot", daysAgo: 0.5, commits: 4),
             FakeBranch(name: "replace-fork-icon", author: "amelie", daysAgo: 2),
         ],
         "linguist": [
             FakeBranch(name: "main", author: "hubot", daysAgo: 20),
-            FakeBranch(name: "gleam-support", author: "mona", daysAgo: 1.5),
+            FakeBranch(name: "gleam-support", author: "mona", daysAgo: 1.5, commits: 9, mainMoved: 2),
             FakeBranch(name: "swift-macros", author: "amelie", daysAgo: 2),
-            FakeBranch(name: "fix/header-heuristics", author: "Jan de Vries", daysAgo: 9, authorLogin: false),
+            FakeBranch(name: "fix/header-heuristics", author: "Jan de Vries", daysAgo: 9, authorLogin: false, parent: "swift-macros", commits: 1),
         ],
     ]
+
+    /// De branch en doelbranch van open PR's ("repo#nummer"), voor de boom in Branches.
+    static let prBranches: [String: (head: String, base: String)] = [
+        "hello-world#41": ("dependabot/npm_and_yarn/lodash-4.17.21", "main"),
+        "hello-world#40": ("dutch-greeting", "main"),
+        "spoon-knife#22": ("update-express", "main"),
+        "linguist#12": ("swift-macros", "main"),
+    ]
+
+    /// `GET /repos/octocat/<repo>/compare/<sha>...<sha>` tussen twee branches uit `branches`: voor
+    /// zijn de eigen commits van de stamboom van de tweede die de eerste niet heeft, achter
+    /// andersom, plus wat main kreeg sinds de tweede aftakte. nil voor een onbekende sha.
+    static func compare(repo: String, spec: String) -> String? {
+        let shas = spec.components(separatedBy: "...")
+        guard shas.count == 2, let list = branches[repo] else { return nil }
+        let byName = Dictionary(uniqueKeysWithValues: list.map { ($0.name, $0) })
+        func branch(_ sha: String) -> FakeBranch? { list.first { self.sha(repo: repo, branch: $0.name) == sha } }
+        guard let base = branch(shas[0]), let head = branch(shas[1]) else { return nil }
+        func chain(_ branch: FakeBranch) -> [FakeBranch] {
+            var result: [FakeBranch] = []
+            var current: FakeBranch? = branch
+            while let b = current, b.name != "main", !result.contains(where: { $0.name == b.name }) {
+                result.append(b)
+                current = byName[b.parent ?? "main"]
+            }
+            return result
+        }
+        let (baseChain, headChain) = (chain(base), chain(head))
+        let ahead = headChain.filter { b in !baseChain.contains { $0.name == b.name } }.reduce(0) { $0 + $1.commits }
+        var behind = baseChain.filter { b in !headChain.contains { $0.name == b.name } }.reduce(0) { $0 + $1.commits }
+        if base.name == "main" { behind += headChain.last?.mainMoved ?? 0 }
+        return #"{"ahead_by":\#(ahead),"behind_by":\#(behind)}"#
+    }
 
     /// Een vaste sha per branch, zodat een volgende start dezelfde heads ziet en niets als push meldt.
     static func sha(repo: String, branch: String) -> String {
@@ -339,8 +378,9 @@ nonisolated enum FakeWorld {
         case "security-advisories":
             return repo == "linguist" ? ownAdvisories : "[]"
         case "compare":
-            // Alleen na een tweede poll met andere heads; dan twee nieuwe commits, geen force-push.
-            return #"{"ahead_by":2,"behind_by":0}"#
+            // Tussen twee branches uit `branches` volgt het hun stamboom; anders (een tweede poll
+            // met andere heads) twee nieuwe commits, geen force-push.
+            return compare(repo: repo, spec: parts.count > 5 ? parts[5] : "") ?? #"{"ahead_by":2,"behind_by":0}"#
         default:
             return nil
         }
@@ -514,7 +554,7 @@ nonisolated enum FakeWorld {
                 return #"{"name":"\#(branch.name)","target":{"oid":"\#(sha(repo: name, branch: branch.name))","#
                     + #""committedDate":"\#(iso(branch.daysAgo))","author":\#(author)}}"#
             }
-            fields.append(#""r\#(index)":{"refs":{"totalCount":\#(nodes.count),"pageInfo":{"hasNextPage":false,"endCursor":null},"#
+            fields.append(#""r\#(index)":{"defaultBranchRef":{"name":"main"},"refs":{"totalCount":\#(nodes.count),"pageInfo":{"hasNextPage":false,"endCursor":null},"#
                 + #""nodes":["# + nodes.joined(separator: ",") + "]}}")
         }
         return #"{"data":{"# + fields.joined(separator: ",") + "}}"
@@ -580,6 +620,9 @@ nonisolated enum FakeWorld {
                     errors.append(#"{"type":"FORBIDDEN","path":["pr\#(index)","pullRequest","headCommit","nodes",0,"commit","statusCheckRollup"],"#
                         + #""message":"Resource not accessible by integration"}"#)
                 }
+            }
+            if asked.contains("baseRefName"), let refs = prBranches["\(repo)#\(number)"] {
+                parts.append(#""baseRefName":"\#(refs.base)","headRefName":"\#(refs.head)""#)
             }
             if asked.contains("isInMergeQueue") {
                 if let position = mergeQueue["\(repo)#\(number)"] {

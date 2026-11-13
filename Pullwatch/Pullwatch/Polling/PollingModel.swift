@@ -161,6 +161,8 @@ final class PollingModel {
     }
 
     func tick() async {
+        // De boom van de vorige keer, ook na een start, voordat de poll hem bijwerkt.
+        if branches.trees.isEmpty { branches.trees = await engine.branchTrees() }
         await notifications.refreshAuthorization()
         let accounts = config.pollableAccounts
         let retention = config.historyRetention
@@ -203,8 +205,9 @@ final class PollingModel {
         await updateRefetchProgress()
         versions.startNewRepoVersionCheckIfNeeded(after: result)
         // Pas na de PR's en tags: een trage of mislukte branch-poll houdt die nooit op.
-        let pushes = await engine.pollBranches(accounts: accounts)
+        let pushes = await engine.pollBranches(accounts: accounts, retention: config.historyRetention)
         branches.apply(pushes, retention: config.historyRetention, now: Date())
+        branches.trees = await engine.branchTrees()
         unreachableRepos = await engine.unreachableRepos()
         branchesCheckedAt = await engine.lastBranchCheck()
     }

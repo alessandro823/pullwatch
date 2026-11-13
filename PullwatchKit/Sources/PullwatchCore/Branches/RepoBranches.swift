@@ -36,7 +36,7 @@ public struct RepoBranches: Codable, Equatable, Sendable, Identifiable {
 }
 
 /// Eén branch in `RepoBranches`.
-public struct BranchInfo: Codable, Equatable, Sendable, Identifiable {
+public struct BranchInfo: Codable, Hashable, Sendable, Identifiable {
     /// Waar de ouder van een branch vandaan komt.
     public enum ParentSource: String, Codable, Sendable {
         /// De doelbranch van een open PR vanaf deze branch.
@@ -66,6 +66,8 @@ public struct BranchInfo: Codable, Equatable, Sendable, Identifiable {
     /// zodat alleen een verandering een nieuwe vergelijking kost.
     public var comparedParent: String?
     public var comparedDefault: String?
+    /// De vergelijking met de ouder bij de dienst, bij de heads van `comparedParent`.
+    public var parentCompareURL: URL?
     /// Het nummer van een open PR vanaf deze branch.
     public var pullRequest: Int?
     /// Wanneer de branch verdween; nil zolang hij er is.

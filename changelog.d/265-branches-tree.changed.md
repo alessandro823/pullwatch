@@ -1,0 +1,1 @@
+- Branches shows each repository as a tree: the default branch at the top and every branch under the branch it was made from (the target of its pull request, or worked out from the history), with who pushed last, how far it is ahead and behind, and an inspector with the pushes of the selected branch. Merged and deleted branches can be shown with a toolbar switch.
