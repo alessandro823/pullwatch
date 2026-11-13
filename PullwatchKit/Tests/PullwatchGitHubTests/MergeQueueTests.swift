@@ -77,6 +77,20 @@ import PullwatchTestSupport
         #expect(!body.contains("commits(last"))
     }
 
+    @Test func `An open pull request gets its branch and target branch`() async throws {
+        let http = makeHTTP(graphQL: #"""
+            {"data":{"pr0":{"pullRequest":{"isInMergeQueue":false,"baseRefName":"main","headRefName":"feature/x"}},
+                     "pr1":{"pullRequest":{"isInMergeQueue":false}}}}
+            """#)
+        let prs = try await makeProvider(http).openPullRequests()
+
+        let first = try #require(prs.first { $0.number == 1 })
+        #expect(first.sourceBranch == "feature/x")
+        #expect(first.targetBranch == "main")
+        #expect(prs.first { $0.number == 2 }?.targetBranch == nil)
+        #expect(try #require(graphQLBodies(http).first).contains("baseRefName headRefName"))
+    }
+
     @Test func `A server without merge queues is not asked again`() async throws {
         let http = makeHTTP(graphQL: #"""
             {"errors":[{"message":"Field 'isInMergeQueue' doesn't exist on type 'PullRequest'","extensions":{"code":"undefinedField"}}]}

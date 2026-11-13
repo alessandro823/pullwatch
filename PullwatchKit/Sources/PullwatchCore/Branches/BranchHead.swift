@@ -42,20 +42,23 @@ public struct BranchFetch: Equatable, Sendable {
     public var fingerprints: [String: String]
     /// Repo's die sinds de vorige vingerafdruk niet veranderden.
     public var unchangedRepos: [String]
+    /// Per gelezen repo de standaardbranch, als de dienst hem in hetzelfde antwoord noemt.
+    public var defaultBranches: [String: String]
 
     public init(
         heads: [BranchHead] = [], unavailableRepos: [String] = [], fingerprints: [String: String] = [:],
-        unchangedRepos: [String] = []
+        unchangedRepos: [String] = [], defaultBranches: [String: String] = [:]
     ) {
         self.heads = heads
         self.unavailableRepos = unavailableRepos
         self.fingerprints = fingerprints
         self.unchangedRepos = unchangedRepos
+        self.defaultBranches = defaultBranches
     }
 }
 
 /// Hoeveel commits een branch voor of achter ligt op een andere.
-public struct BranchComparison: Equatable, Sendable {
+public struct BranchComparison: Codable, Equatable, Sendable {
     public let ahead: Int
     public let behind: Int
 

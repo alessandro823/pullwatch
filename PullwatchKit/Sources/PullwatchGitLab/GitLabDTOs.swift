@@ -46,6 +46,8 @@ struct MergeRequestDTO: Decodable {
     let author: Author
     let webUrl: String
     let references: References?
+    let sourceBranch: String?
+    let targetBranch: String?
     let sha: String?
     /// Auto-merge staat aan: merge zodra de pipeline slaagt, of in de merge train.
     let mergeWhenPipelineSucceeds: Bool?
@@ -117,6 +119,8 @@ struct BranchDTO: Decodable {
 
     let name: String
     let commit: Commit
+    /// De standaardbranch van het project.
+    let `default`: Bool?
 }
 
 /// De commits die `repository/compare` tussen twee punten vindt; alleen het aantal telt.

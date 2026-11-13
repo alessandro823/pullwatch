@@ -16,6 +16,8 @@ extension GitHubProvider {
     private struct QueueAnswer {
         var entries: [String: MergeQueueEntry] = [:]
         var unread: Set<String> = []
+        /// Per PR (dedupKey) zijn branch en doelbranch, voor de boom in Branches.
+        var branches: [String: (source: String, target: String)] = [:]
     }
 
     public func unreadMergeQueues() async -> Set<String> {
@@ -38,10 +40,12 @@ extension GitHubProvider {
         }
         var found: [String: MergeQueueEntry] = [:]
         var unread: Set<String> = []
+        var branches: [String: (source: String, target: String)] = [:]
         for batch in candidates.chunked(Self.mergeQueueBatch) {
             do {
                 let answer = try await mergeQueues(of: batch)
                 found.merge(answer.entries) { _, new in new }
+                branches.merge(answer.branches) { _, new in new }
                 unread.formUnion(answer.unread)
                 for key in answer.unread { if let known = knownMergeQueues[key] { found[key] = known } }
             } catch is GraphQLSchemaMismatch {
@@ -61,6 +65,10 @@ extension GitHubProvider {
         return pullRequests.map { pr in
             var pr = pr
             pr.mergeQueue = found[pr.dedupKey]
+            if let refs = branches[pr.dedupKey] {
+                pr.sourceBranch = refs.source
+                pr.targetBranch = refs.target
+            }
             return pr
         }
     }
@@ -79,6 +87,9 @@ extension GitHubProvider {
             if let state = node.state, state != "OPEN" || node.isDraft == true {
                 answer.unread.insert(pr.dedupKey)
                 continue
+            }
+            if let source = node.headRefName, let target = node.baseRefName {
+                answer.branches[pr.dedupKey] = (source, target)
             }
             if node.isInMergeQueue == true || node.mergeQueueEntry != nil {
                 answer.entries[pr.dedupKey] = MergeQueueEntry(

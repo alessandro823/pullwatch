@@ -75,6 +75,9 @@ struct PullRequestDTO: Decodable {
 
     let pullRequestId: Int
     let title: String
+    /// `refs/heads/<branch>`.
+    let sourceRefName: String?
+    let targetRefName: String?
     let isDraft: Bool?
     let status: String?
     let closedDate: String?

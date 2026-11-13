@@ -215,6 +215,8 @@ import PullwatchTestSupport
         #expect(pr.state == .open)
         #expect(pr.closedAt == nil)
         #expect(pr.revision == "6315b3bac849")
+        #expect(pr.sourceBranch == "renovate/5.1.x-patch-patches")
+        #expect(pr.targetBranch == "5.1.x")
         #expect(pr.webURL.absoluteString == "https://bitbucket.org/atlassian/atlassian-event/pull-requests/219")
         #expect(urls(http).contains("\(api)repositories/atlassian/atlassian-event/pullrequests?state=OPEN&pagelen=50"))
     }

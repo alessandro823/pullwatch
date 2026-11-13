@@ -155,8 +155,9 @@ struct PRDetailQuery: Encodable {
             }
             if item.mergeQueue {
                 // `state` en `isDraft` zijn verser dan de zoek-API: een PR die net gemerged is staat
-                // daar soms nog open. `autoMergeRequest`: auto-merge zonder merge queue.
-                selections.append("state isDraft isInMergeQueue mergeQueueEntry { state position enqueuedAt } autoMergeRequest { enabledAt }")
+                // daar soms nog open. `autoMergeRequest`: auto-merge zonder merge queue. De branches
+                // zijn voor de boom in Branches (de zoek-API geeft ze niet).
+                selections.append("state isDraft isInMergeQueue mergeQueueEntry { state position enqueuedAt } autoMergeRequest { enabledAt } baseRefName headRefName")
             }
             if let kind = item.queueExit {
                 let type = kind == .autoMerge ? "AUTO_MERGE_DISABLED_EVENT" : "REMOVED_FROM_MERGE_QUEUE_EVENT"
@@ -188,6 +189,8 @@ struct PRDetailQuery: Encodable {
             let headCommit: HeadCommits?
             let state: String?
             let isDraft: Bool?
+            let baseRefName: String?
+            let headRefName: String?
             let isInMergeQueue: Bool?
             let mergeQueueEntry: MergeQueueEntryNode?
             let autoMergeRequest: AutoMergeRequestNode?

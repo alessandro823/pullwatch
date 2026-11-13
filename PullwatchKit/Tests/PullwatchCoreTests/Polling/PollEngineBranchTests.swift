@@ -16,8 +16,10 @@ import PullwatchTestSupport
             engine = PollEngine(makeProvider: { _ in provider }, store: nil, now: { clock.now })
         }
 
-        /// Eén ronde zoals de app hem doet: eerst `poll`, dan `pollBranches`.
+        /// Eén ronde zoals de app hem doet: eerst `poll`, dan `pollBranches`. Zonder vergelijkingen
+        /// voor de boom (`PollEngineBranchTreeTests`), zodat `compareCalls` alleen de pushes telt.
         func poll(_ account: Account) async -> Tick {
+            await engine.setBranchTreeBudget(0)
             let result = await engine.poll(accounts: [account], interval: 120, retention: .oneYear)
             return Tick(result: result, branchPushes: await engine.pollBranches(accounts: [account]))
         }
