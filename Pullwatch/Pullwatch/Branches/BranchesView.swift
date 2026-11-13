@@ -5,8 +5,9 @@ import SwiftUI
 /// een tabel zoals die van PR's en Tags. Zoeken, filters op repo en persoon en "Alleen anderen" in
 /// de knoppenbalk; dubbelklik opent de vergelijking (of de branch) in de browser.
 struct BranchesView: View {
-    /// Het symbool van het onderdeel in de zijbalk en de lege staat.
-    static let symbol = "arrow.triangle.branch"
+    /// Het symbool van het onderdeel in de zijbalk en de lege staat: de Octicon git-branch, zoals
+    /// GitHub branches toont (`branch.symbolset`, zie NOTICE).
+    static let glyph: Glyph = .asset("branch")
 
     @Environment(BranchesModel.self) private var branches
     @Environment(AppRouter.self) private var router
@@ -51,7 +52,11 @@ struct BranchesView: View {
         .overlay {
             if branches.log.pushes.isEmpty {
                 ContentUnavailableView {
-                    Label("Nog geen branches", systemImage: Self.symbol)
+                    Label {
+                        Text("Nog geen branches")
+                    } icon: {
+                        Self.glyph.image
+                    }
                 } description: {
                     Text("Pullwatch toont hier pushes naar branches van repositories die je volgt.")
                 } actions: {

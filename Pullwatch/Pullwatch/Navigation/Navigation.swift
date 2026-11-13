@@ -31,7 +31,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         switch self {
         case .pullRequests: ItemKind.pullRequest.glyph
         case .tags: ItemKind.tag.glyph
-        case .branches: .system(BranchesView.symbol)
+        case .branches: BranchesView.glyph
         case .stats: .system("chart.bar")
         case .repos: .system("folder")
         case .dependencies: .system("shippingbox")

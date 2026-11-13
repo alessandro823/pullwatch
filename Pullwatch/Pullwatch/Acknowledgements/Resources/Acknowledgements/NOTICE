@@ -10,8 +10,9 @@ git-pull-request-draft, git-merge-queue, git-merge and git-pull-request-closed,
 used for the pull request symbols in Pullwatch/Pullwatch/Assets.xcassets
 (pr.*.symbolset),
 the menu bar icon (MenuBarIcon.imageset) and the glyph of the app icon
-(AppIcon.icon/Assets/pull-request.svg); and check, x and dot-fill, used for
-the symbols of a pull request's checks (checks.*.symbolset). They are
+(AppIcon.icon/Assets/pull-request.svg); check, x and dot-fill, used for
+the symbols of a pull request's checks (checks.*.symbolset); and git-branch,
+used for the symbol of the Branches section (branch.symbolset). They are
 licensed under the MIT License:
 
   MIT License
