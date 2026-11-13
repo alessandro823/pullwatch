@@ -4,10 +4,11 @@
 # Claude Code PreToolUse hook (matcher: Bash). Refuses:
 #   - rm -rf outside the temp directory
 #   - force-pushes touching main, and bare force-pushes
-#   - any push to the upstream repository (alessandro823/pullwatch): work
-#     goes to the fork; upstream gets one combined pull request at the end
-#   - gh pr create without --repo Vernum-Projecten/pullwatch (a fork's
-#     default target is upstream)
+#   - any push to main: a change reaches alessandro823/pullwatch's main
+#     only through a pull request Alessandro merges
+#   - gh pr merge: Alessandro merges, never a session
+#   - gh pr create without --repo alessandro823/pullwatch (the gh default
+#     repository is the fork, which keeps the tracker)
 #   - security commands that would export or delete signing identities
 
 set -euo pipefail
@@ -39,15 +40,24 @@ if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[^;|&]*(--force([^-]|$)|--f
   fi
 fi
 
-if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[[:space:]]+([^;|&]*[[:space:]])?(upstream|[^[:space:]]*alessandro823/pullwatch)'; then
-  echo "BLOCKED: never push to upstream (alessandro823/pullwatch). Push to origin (Vernum-Projecten/pullwatch) and open a pull request (CLAUDE.md, Workflow)." >&2
+# `git push origin main`, `HEAD:main`, `x:refs/heads/main`; the fork follows
+# origin/main with `git push fork origin/main:main`, which is allowed.
+if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[[:space:]]'; then
+  if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[[:space:]]+([^;|&]*[[:space:]])?(origin|[^[:space:]]*alessandro823/pullwatch[^[:space:]]*)[[:space:]]+([^;|&]*[[:space:]:])?(refs/heads/)?(main|master)([[:space:]]|$|[;&|])'; then
+    echo "BLOCKED: never push to main in alessandro823/pullwatch. Push a branch and open a pull request; Alessandro merges (CLAUDE.md, Where the work happens)." >&2
+    exit 2
+  fi
+fi
+
+if printf '%s' "$cmd" | grep -qE '(^|[;&|(][[:space:]]*)gh[[:space:]]+pr[[:space:]]+merge'; then
+  echo "BLOCKED: never merge a pull request; Alessandro reviews and merges (CLAUDE.md, Where the work happens)." >&2
   exit 2
 fi
 
-# In a fork, a bare `gh pr create` targets the parent repository.
-if printf '%s' "$cmd" | grep -qE 'gh[[:space:]]+pr[[:space:]]+create'; then
-  if ! printf '%s' "$cmd" | grep -qE '(--repo|-R)[[:space:]=]+Vernum-Projecten/pullwatch([[:space:]]|$)'; then
-    echo "BLOCKED: open pull requests in the fork only: gh pr create --repo Vernum-Projecten/pullwatch --base main. Upstream gets one combined pull request when the owner says so (CLAUDE.md, Where the work happens)." >&2
+# The gh default repository is the fork (the tracker); pull requests go to Alessandro's repository.
+if printf '%s' "$cmd" | grep -qE '(^|[;&|(][[:space:]]*)gh[[:space:]]+pr[[:space:]]+create'; then
+  if ! printf '%s' "$cmd" | grep -qE '(--repo|-R)[[:space:]=]+alessandro823/pullwatch([[:space:]]|$)'; then
+    echo "BLOCKED: open pull requests in Alessandro's repository: gh pr create --repo alessandro823/pullwatch --base main (CLAUDE.md, Where the work happens)." >&2
     exit 2
   fi
 fi
