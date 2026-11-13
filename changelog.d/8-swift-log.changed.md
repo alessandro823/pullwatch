@@ -1,1 +1,0 @@
-- SwiftLog, used inside the MCP Swift SDK for the agent connection, is updated to 1.17.0 (#8).

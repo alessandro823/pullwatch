@@ -9,6 +9,13 @@ release wait as fragments in `changelog.d/` until the cut writes them here.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-13
+
+### Changed
+
+- SwiftLog, used inside the MCP Swift SDK for the agent connection, is updated to 1.17.0 (#8).
+- The Branches section shows GitHub's git-branch icon, as on GitHub (#14).
+
 ## [0.10.0] - 2026-11-12
 
 ### Added
@@ -486,7 +493,8 @@ before this changelog existed. The fork starts from this version.
 - The repository overview is calculated once instead of on every screen
   update.
 
-[Unreleased]: https://github.com/alessandro823/pullwatch/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/alessandro823/pullwatch/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/alessandro823/pullwatch/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/alessandro823/pullwatch/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/alessandro823/pullwatch/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/alessandro823/pullwatch/compare/v0.8.0...v0.9.0
