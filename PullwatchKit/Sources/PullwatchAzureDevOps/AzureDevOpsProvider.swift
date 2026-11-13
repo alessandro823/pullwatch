@@ -222,10 +222,17 @@ public actor AzureDevOpsProvider: PRProvider {
             revision: dto.lastMergeSourceCommit?.commitId,
             // Auto-complete aan: de PR voltooit vanzelf zodra de policies slagen. Azure DevOps
             // geeft geen plek in een rij en geen tijdstip.
-            mergeQueue: state == .open && dto.autoCompleteSetBy != nil ? MergeQueueEntry(kind: .autoComplete) : nil
+            mergeQueue: state == .open && dto.autoCompleteSetBy != nil ? MergeQueueEntry(kind: .autoComplete) : nil,
+            sourceBranch: dto.sourceRefName.flatMap(Self.branchName),
+            targetBranch: dto.targetRefName.flatMap(Self.branchName)
         )
         if let email = dto.createdBy.uniqueName { authorEmails[pullRequest.dedupKey] = email }
         if let id = dto.repository.project.id { projectIds[pullRequest.dedupKey] = id }
         return pullRequest
+    }
+
+    /// `refs/heads/feature/x` wordt `feature/x`; een andere ref (een tag, een PR-merge) geen branch.
+    static func branchName(_ ref: String) -> String? {
+        ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : nil
     }
 }

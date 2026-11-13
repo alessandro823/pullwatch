@@ -2,7 +2,7 @@ import Foundation
 import PullwatchCore
 
 /// Wat het onderdeel Branches toont: een zoektekst (in branch, repo en auteur), één repo, één
-/// persoon en of eigen pushes wegblijven. Alleen een waarde, zodat de tests het zonder view kunnen
+/// persoon en of eigen pushes wegblijven; voor de pushes (`apply`) en de boom (`matches`). Alleen een waarde, zodat de tests het zonder view kunnen
 /// nagaan.
 nonisolated struct BranchFilter: Equatable {
     var searchText: String = ""
@@ -32,6 +32,20 @@ nonisolated struct BranchFilter: Equatable {
                 || push.repo.localizedCaseInsensitiveContains(query)
                 || push.authorName?.localizedCaseInsensitiveContains(query) == true
         }
+    }
+
+    /// Of een branch in de boom door het filter komt, met dezelfde regels als een push.
+    func matches(_ info: BranchInfo, repo: String) -> Bool {
+        if othersOnly && info.isOwn { return false }
+        if let filterRepo = self.repo, repo.caseInsensitiveCompare(filterRepo) != .orderedSame { return false }
+        if let author {
+            guard let name = info.authorName, name.caseInsensitiveCompare(author) == .orderedSame else { return false }
+        }
+        let query = query
+        return query.isEmpty
+            || info.name.localizedCaseInsensitiveContains(query)
+            || repo.localizedCaseInsensitiveContains(query)
+            || info.authorName?.localizedCaseInsensitiveContains(query) == true
     }
 
     private var query: String { searchText.trimmingCharacters(in: .whitespaces) }

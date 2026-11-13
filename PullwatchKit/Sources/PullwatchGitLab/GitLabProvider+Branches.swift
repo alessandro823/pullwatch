@@ -25,6 +25,7 @@ extension GitLabProvider {
                 }
                 let heads = branches.compactMap { makeHead(repo: repo, $0) }
                 fetch.fingerprints[repo] = fingerprint
+                if let name = branches.first(where: { $0.default == true })?.name { fetch.defaultBranches[repo] = name }
                 fetch.heads += heads
             } catch ProviderError.server(status: 404) {
                 fetch.unavailableRepos.append(repo) // bestaat niet (meer)

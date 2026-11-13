@@ -53,6 +53,8 @@ struct PullRequestDTO: Decodable {
             let fullName: String
         }
 
+        /// De branchnaam.
+        let ref: String?
         let sha: String?
         let repo: Repository?
     }

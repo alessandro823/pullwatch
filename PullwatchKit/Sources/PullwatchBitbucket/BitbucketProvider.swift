@@ -245,7 +245,10 @@ public actor BitbucketProvider: PRProvider {
             closedAt: state == .open ? nil : dto.updatedOn.flatMap(DateParsing.parse),
             // De laatste commit van de bronbranch: verandert bij elke push, niet bij een reactie.
             revision: dto.source?.commit?.hash ?? dto.updatedOn,
-            mergeQueue: state == .open && dto.queued == true ? MergeQueueEntry(kind: .mergeQueue) : nil
+            mergeQueue: state == .open && dto.queued == true ? MergeQueueEntry(kind: .mergeQueue) : nil,
+            // Alleen uit dezelfde repo: een branch in een fork hoort niet in de boom.
+            sourceBranch: dto.source?.repository?.fullName == dto.destination?.repository?.fullName ? dto.source?.branch?.name : nil,
+            targetBranch: dto.destination?.branch?.name
         )
         if !authorName.isEmpty { authorNames[pullRequest.dedupKey] = authorName }
         return pullRequest

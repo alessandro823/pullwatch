@@ -14,7 +14,7 @@ extension PollEngine {
     /// de laatste poll slaagde: de gebruiker daaruit bepaalt welke pushes van jezelf zijn, en de
     /// lijst van de dienst uit de tag-poll van net wordt hergebruikt. De app roept dit aan nadat
     /// ze de uitkomst van `poll` verwerkte; een trage of mislukte branch-poll houdt die dus niet op.
-    public func pollBranches(accounts: [Account]) async -> [BranchPush] {
+    public func pollBranches(accounts: [Account], retention: HistoryRetention = .oneYear) async -> [BranchPush] {
         let t = now()
         var jobs: [(account: Account, provider: any PRProvider, userId: String, repos: BranchRepos, listed: [String]?)] = []
         for account in accounts where !branchesInFlight.contains(account.id) {
@@ -30,7 +30,13 @@ extension PollEngine {
                 .filter { $0.key.hasPrefix(prefix) }
                 .map { (String($0.key.dropFirst(prefix.count)), $0.value) })
             let listed = listedRepos[account.id].flatMap { t.timeIntervalSince($0.at) <= Self.branchInterval ? $0.repos : nil }
-            jobs.append((account, job.provider, job.userId, BranchRepos(account: account, known: known), listed))
+            let trees = Dictionary(uniqueKeysWithValues: state.repoBranches
+                .filter { $0.key.hasPrefix(prefix) }
+                .map { (String($0.key.dropFirst(prefix.count)), $0.value) })
+            let repos = BranchRepos(
+                account: account, known: known, trees: trees,
+                pullRequests: Self.branchPullRequests(openPullRequests[account.id] ?? []), treeBudget: branchTreeBudget)
+            jobs.append((account, job.provider, job.userId, repos, listed))
         }
         let knownIdentities = identities
         guard !jobs.isEmpty else { return [] }
@@ -43,7 +49,7 @@ extension PollEngine {
             for job in jobs {
                 let known = knownIdentities[job.account.id]
                 group.addTask {
-                    let outcome = await Self.fetchBranches(job.provider, job.repos, listed: job.listed)
+                    let outcome = await Self.fetchBranches(job.provider, job.repos, listed: job.listed, at: t)
                     let identity = known != nil ? known : await Self.fetchIdentity(job.provider)
                     return (job.account.id, outcome, identity)
                 }
@@ -52,7 +58,8 @@ extension PollEngine {
                 guard let job = jobsById[id] else { continue }
                 if let identity { identities[id] = identity }
                 pushes += handleBranches(
-                    job.account, outcome, userId: job.userId, identity: identity ?? nil, provider: job.provider, at: t)
+                    job.account, outcome, userId: job.userId, identity: identity ?? nil, provider: job.provider,
+                    retention: retention, at: t)
                 branchesInFlight.remove(id)
             }
         }
@@ -68,6 +75,12 @@ extension PollEngine {
     struct BranchRepos: Sendable {
         let account: Account
         let known: [String: BranchHeads]
+        /// De boom per repo (lowercased), zoals de vorige poll hem achterliet.
+        var trees: [String: RepoBranches] = [:]
+        /// Per repo (lowercased) per bronbranch de open PR (`branchPullRequests`).
+        var pullRequests: [String: [String: BranchPullRequest]] = [:]
+        /// Vergelijkingen voor de boom in deze poll (`PollEngine.branchTreeBudget`).
+        var treeBudget = PollEngine.branchTreeCompareLimit
     }
 
     /// Uitkomst van het ophalen van branches in één poll.
@@ -81,6 +94,8 @@ extension PollEngine {
         var comparisons: [String: BranchComparison]
         /// Fout die de branches van deze poll overslaat; het account faalt er nooit door.
         var error: ProviderError?
+        /// De bijgewerkte boom per gelezen repo (lowercased); een onbereikbare repo ontbreekt.
+        var trees: [String: RepoBranches] = [:]
     }
 
     /// Sleutel van `BranchOutcome.comparisons`: `"{repo.lowercased()}:{branch}"`.
@@ -110,7 +125,8 @@ extension PollEngine {
     static func fetchBranches(
         _ provider: any PRProvider,
         _ repos: BranchRepos,
-        listed: [String]? = nil
+        listed: [String]? = nil,
+        at now: Date = Date()
     ) async -> BranchOutcome {
         let account = repos.account
         var outcome = BranchOutcome(repos: account.branchRepos, fetch: nil, comparisons: [:], error: nil)
@@ -130,6 +146,8 @@ extension PollEngine {
             }
             var unchanged: [String: String] = [:]
             for repo in outcome.repos {
+                // Zonder boom (van vóór de boom, of net geprunet) eenmaal helemaal lezen.
+                guard repos.trees[repo.lowercased()] != nil else { continue }
                 if let fingerprint = repos.known[repo.lowercased()]?.fingerprint { unchanged[repo] = fingerprint }
             }
             let fetch = try await provider.branches(in: outcome.repos, unchanged: unchanged)
@@ -158,6 +176,25 @@ extension PollEngine {
                     logger.notice("branch vergelijken mislukt voor \(head.repo): \(error.localizedDescription)")
                 }
             }
+            let unavailable = Set(fetch.unavailableRepos.map { $0.lowercased() })
+            let unchangedRepos = Set(fetch.unchangedRepos.map { $0.lowercased() })
+            let headsByRepo = Dictionary(grouping: fetch.heads) { $0.repo.lowercased() }
+            let defaults = Dictionary(
+                fetch.defaultBranches.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { first, _ in first })
+            var budget = repos.treeBudget
+            for repo in outcome.repos {
+                let key = repo.lowercased()
+                guard !unavailable.contains(key) else { continue }
+                let isUnchanged = unchangedRepos.contains(key)
+                guard var tree = repos.trees[key] ?? (isUnchanged ? nil : RepoBranches(accountId: account.id, repo: repo, checkedAt: Date.distantPast))
+                else { continue }
+                tree.repo = repo
+                await updateTree(
+                    &tree, heads: isUnchanged ? nil : headsByRepo[key] ?? [], defaultBranch: defaults[key],
+                    pullRequests: repos.pullRequests[key] ?? [:], provider: provider, budget: &budget,
+                    at: now)
+                outcome.trees[key] = tree
+            }
             return outcome
         } catch let error as ProviderError {
             outcome.error = error
@@ -183,6 +220,7 @@ extension PollEngine {
         userId: String,
         identity: UserIdentity? = nil,
         provider: any PRProvider,
+        retention: HistoryRetention = .oneYear,
         at t: Date
     ) -> [BranchPush] {
         if let error = outcome.error {
@@ -193,6 +231,7 @@ extension PollEngine {
             return []
         }
         scheduleBranches(of: account, at: t, rateLimitedUntil: nil)
+        lastBranchCheckAt = max(lastBranchCheckAt ?? t, t)
         let wanted = Set(outcome.repos.map { $0.lowercased() })
         forgetBranchHeads(of: account, except: wanted)
         guard let fetch = outcome.fetch else { return [] }
@@ -249,6 +288,14 @@ extension PollEngine {
             }
             state.branchHeads[key] = BranchHeads(heads: heads, fingerprint: fingerprints[repo], seenAt: t)
         }
+        for (repo, tree) in outcome.trees where !unavailable.contains(repo) {
+            var tree = tree
+            for head in headsByRepo[repo] ?? [] {
+                tree.branches[head.name]?.isOwn = Self.isOwn(head, userId: userId, account: account, identity: identity)
+            }
+            Self.pruneRemoved(&tree, retention: retention, now: t)
+            state.repoBranches[prefix + repo] = tree
+        }
         return pushes
     }
 
@@ -264,6 +311,9 @@ extension PollEngine {
     func forgetBranchHeads(of account: Account, except kept: Set<String>) {
         let prefix = "\(account.id.uuidString):"
         state.branchHeads = state.branchHeads.filter { key, _ in
+            !key.hasPrefix(prefix) || kept.contains(String(key.dropFirst(prefix.count)))
+        }
+        state.repoBranches = state.repoBranches.filter { key, _ in
             !key.hasPrefix(prefix) || kept.contains(String(key.dropFirst(prefix.count)))
         }
     }

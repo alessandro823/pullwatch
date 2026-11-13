@@ -130,6 +130,28 @@ public actor PollEngine {
     /// Per account de gevolgde repo's die het token niet kan lezen (`unreachableRepos()`). Niet
     /// bewaard: de eerste tag- en branch-poll na een start vult het weer.
     var unreachable: [UUID: UnreachableRepos] = [:]
+    /// Wanneer de branches het laatst zonder fout opgehaald werden, voor "Gecheckt …" in
+    /// Branches (`lastBranchCheck()`). Niet bewaard: na een start telt de eerste ronde.
+    var lastBranchCheckAt: Date?
+    /// Per account de open PR's van de laatste geslaagde PR-poll, voor de ouders in de boom van
+    /// Branches (`PullRequest.targetBranch`). Niet bewaard: de eerste poll na een start vult het.
+    var openPullRequests: [UUID: [PullRequest]] = [:]
+    /// Vergelijkingen per account per branch-poll voor de boom (`branchTreeCompareLimit`); de
+    /// tests van de pushes zetten hem op nul, zodat ze alleen hun eigen vergelijkingen tellen.
+    var branchTreeBudget = PollEngine.branchTreeCompareLimit
+
+    func setBranchTreeBudget(_ budget: Int) {
+        branchTreeBudget = budget
+    }
+
+    /// Alleen voor de tests: seen.json van vóór de boom.
+    func forgetBranchTrees() {
+        state.repoBranches = [:]
+    }
+    /// De boom van Branches van alle gevolgde repo's, uit de laatste branch-polls.
+    public func branchTrees() -> [RepoBranches] {
+        Array(state.repoBranches.values)
+    }
     private var schedules: [UUID: Schedule] = [:]
     private var statuses: [UUID: AccountState] = [:]
     private var inFlight: Set<UUID> = []
@@ -194,6 +216,12 @@ public actor PollEngine {
     /// branch-poll die lukte; een account zonder onbereikbare repo's staat er niet in.
     public func unreachableRepos() -> [UUID: UnreachableRepos] {
         unreachable.filter { !$0.value.isEmpty }
+    }
+
+    /// Wanneer de branches van minstens één account het laatst zonder fout opgehaald werden;
+    /// `nil` zolang dat sinds de start nog niet gebeurde.
+    public func lastBranchCheck() -> Date? {
+        lastBranchCheckAt
     }
 
     /// Tijdstip van de laatste geslaagde sync per account (alleen accounts met een sync).
@@ -331,6 +359,7 @@ public actor PollEngine {
                     result.syncedTags += fresh.backfill
                     if fetched.tags != nil { result.tagRepos[id] = fetched.tagRepos }
                     if let listed = fetched.listedRepos { listedRepos[id] = (listed, t) }
+                    openPullRequests[id] = fetched.pullRequests.filter { $0.state == .open }
                     let sync = handleSync(job.account, fetched, request: job.sync, retention: retention, at: t)
                     result.syncedPullRequests += sync.pullRequests
                     result.completedPullRequests += sync.completed

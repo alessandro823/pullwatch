@@ -1,32 +1,48 @@
 ---
 title: Branches
-description: Welche Branches deiner gefolgten Repositories Pushes bekommen haben, von wem und wann.
+description: Die Branches deiner gefolgten Repositories als Baum ab dem Standard-Branch: wer zuletzt gepusht hat und wie weit jeder Branch von seinem Ursprung entfernt ist.
 ---
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-**Branches** in der Seitenleiste (⌘3) zeigt Pushes auf die Branches der Repositories, denen du folgst, neueste zuerst. Der Bereich beantwortet eine Frage, die die Listen PRs und Tags nicht beantworten: Wer arbeitet woran, bevor es einen Pull Request oder Tag gibt.
+**Branches** in der Seitenleiste (⌘3) zeigt die Branches der Repositories, denen du folgst, als Baum: pro Repository oben der Standard-Branch und jeder andere Branch unter dem Branch, aus dem er erstellt wurde. Der Bereich beantwortet eine Frage, die die Listen PRs und Tags nicht beantworten: Wer arbeitet woran, bevor es einen Pull Request oder Tag gibt.
 
-<Screenshot name="branches" alt="Der Bereich Branches: Pushes auf Branches von drei Repositories, jeweils mit Branch-Namen, Repository, Autor, der Zahl neuer Commits und dem Zeitpunkt des Pushs." />
+<Screenshot name="branches" alt="Der Bereich Branches: pro Repository ein Baum ab main, mit einem gestapelten Branch unter dem Branch, aus dem er erstellt wurde, wer zuletzt gepusht hat, wie weit jeder Branch voraus und zurück ist, und der Inspektor des gewählten Branches." />
 
-## Was eine Zeile zeigt
+## Der Baum
 
-Jede Zeile hat den Branch, das Repository, wer gepusht hat (mit Bild), die Commits und wann. Die Spalte Commits sagt, was passiert ist:
+Jedes Repository ist eine Gruppe, die du mit einem Klick auf den Namen einklappst; daneben steht, wie viele Branches heute einen Push bekamen. Darunter:
 
-- `+3`: drei neue Commits, seit Pullwatch zuletzt nachgesehen hat.
-- **Force-Push**: Der Branch wurde umgeschrieben, sein Verlauf knüpft also nicht mehr an den früheren an.
-- **Neuer Branch**: Den Branch gab es noch nicht.
-- Ohne Label: der letzte Commit eines Branches, der sich in den letzten 14 Tagen bewegt hat. So füllt Pullwatch die Liste beim ersten Lesen eines Repositorys, damit der Bereich nicht leer beginnt.
+- Der Standard-Branch, markiert mit **Standard**.
+- Jeder Branch unter dem Branch, aus dem er erstellt wurde, beliebig tief. Der neueste Push steht oben.
+- **Wer**: wer zuletzt gepusht hat, mit Bild. Ein Klick auf einen Namen zeigt nur dessen Branches.
+- **Voraus / Zurück**: ↑3 ↓1 heißt drei Commits, die der Ursprung nicht hat, und ein Commit des Ursprungs, den dieser Branch noch nicht hat.
+- **Letzter Push**, mit einem Punkt, wenn er in der letzten Stunde war.
+- Eine Pille mit der Nummer eines offenen Pull Requests, und **Neuer Branch** oder **Force-Push**, wenn das am letzten Tag geschah.
 
-Pullwatch sieht, was sich zwischen zwei Lesevorgängen geändert hat, nicht jeden einzelnen Push. Drei Pushes zwischen zwei Lesevorgängen sind eine Zeile mit allen neuen Commits.
+## Woher Pullwatch weiß, woher ein Branch kommt
+
+Git und die Dienste speichern nicht, aus welchem Branch ein Branch erstellt wurde. Pullwatch ermittelt es in dieser Reihenfolge:
+
+1. Der Ziel-Branch eines offenen Pull Requests von diesem Branch.
+2. Sonst der Verlauf: der Branch, dem er die wenigsten Commits voraus ist, so wie Git es selbst vorschlägt.
+3. Sonst der Standard-Branch.
+
+Der Inspektor sagt, welcher der drei Wege es war. Das kostet ein paar Anfragen pro neuem Branch, daher braucht ein Repository mit vielen neuen Branches manchmal ein paar Abrufe, bis alles an seinem Platz ist; bis dahin hängt so ein Branch unter dem Standard-Branch.
+
+## Der Inspektor
+
+Wähle einen Branch, um ihn rechts zu sehen: den Pfad ab dem Standard-Branch, **Mit Ursprung vergleichen** (der Vergleich beim Dienst), **Im Browser öffnen** und **Branch-Namen kopieren**. Darunter **Erstellt aus** mit der Herkunft dieser Angabe, wie weit der Branch von seinem Ursprung und vom Standard-Branch entfernt ist, sein Pull Request und der letzte Push. **Aktivität** listet die Pushes, die Pullwatch gesehen hat; jeder öffnet seinen Vergleich.
+
+Pullwatch sieht, was sich zwischen zwei Abrufen geändert hat, nicht jeden einzelnen Push. Drei Pushes zwischen zwei Abrufen sind ein Eintrag mit allen neuen Commits.
 
 ## Suchen und Filter
 
-Suche nach Branch, Repository oder Person. Die Symbolleiste filtert nach einem Repository oder einer Person, und ein Klick auf einen Namen in der Tabelle filtert ebenfalls nach dieser Person. **Nur andere** blendet deine eigenen Pushes aus.
+Suche nach Branch, Repository oder Person. Die Symbolleiste filtert nach einem Repository oder einer Person; **Nur andere** blendet die Branches aus, auf die du zuletzt gepusht hast. Ein gefundener Branch behält die Branches über ihm, damit du siehst, wo er hängt.
 
-Pullwatch erkennt deine eigenen Pushes an deinem Konto auf GitHub, und auf Bitbucket und Gitea dort, wo das Konto mit der Person verknüpft ist. Sonst vergleicht es Namen und E-Mail-Adresse des Autors mit deinen.
+**Gelöschte Branches** zeigt auch gemergte oder gelöschte Branches, abgeblendet und durchgestrichen, solange der Verlauf aufbewahrt wird. **Neu laden** liest die Branches sofort; der Untertitel sagt, wann sie zuletzt geprüft wurden.
 
-Doppelklicke eine Zeile (oder wähle **Im Browser öffnen** im Kontextmenü), um den Vergleich beim Dienst zu öffnen. Pullwatch zeigt selbst keine Commits oder Dateien.
+Pullwatch erkennt deine eigenen Pushes an deinem Konto auf GitHub, und auf Bitbucket und Gitea, wo das Konto mit der Person verknüpft ist. Sonst vergleicht es Name und E-Mail-Adresse des Autors mit deinen.
 
 ## Keine Mitteilungen
 

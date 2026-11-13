@@ -18,9 +18,9 @@ import PullwatchTestSupport
 
     func branch(
         _ name: String, id: String, date: String = "2026-11-10T09:00:00.000Z",
-        author: String = "Jan Jansen", email: String = "jan@example.com"
+        author: String = "Jan Jansen", email: String = "jan@example.com", isDefault: Bool = false
     ) -> String {
-        #"{"name":"\#(name)","merged":false,"protected":false,"default":false,"#
+        #"{"name":"\#(name)","merged":false,"protected":false,"default":\#(isDefault),"#
             + #""commit":{"id":"\#(id)","short_id":"abc","title":"t","author_name":"\#(author)","author_email":"\#(email)","#
             + #""committed_date":"\#(date)","created_at":"\#(date)"}}"#
     }
@@ -34,6 +34,17 @@ import PullwatchTestSupport
     func urls(_ http: MockHTTPClient) -> [String] { http.requests.compactMap { $0.url?.absoluteString } }
 
     // MARK: Heads
+
+    @Test func `The branch GitLab marks as default is the default branch`() async throws {
+        let http = MockHTTPClient()
+        http.on("projects/acme%2Fapi/repository/branches", body: list([
+            branch("main", id: "a"), branch("develop", id: "b", isDefault: true),
+        ]))
+
+        let fetch = try await makeProvider(http).branches(in: ["acme/api"], unchanged: [:])
+
+        #expect(fetch.defaultBranches == ["acme/api": "develop"])
+    }
 
     @Test func headsCarryTheCommitAndItsAuthor() async throws {
         let http = MockHTTPClient()

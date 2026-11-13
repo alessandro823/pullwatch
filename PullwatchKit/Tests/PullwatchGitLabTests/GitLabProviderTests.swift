@@ -175,6 +175,8 @@ import PullwatchTestSupport
         #expect(pr.state == .open)
         #expect(pr.closedAt == nil)
         #expect(pr.revision == "a1b2c3d4")
+        #expect(pr.sourceBranch == "feature-12")
+        #expect(pr.targetBranch == "main")
         #expect(pr.createdAt == Date(timeIntervalSince1970: 1_760_522_400))
         #expect(pr.webURL.absoluteString == "https://gitlab.com/acme/platform/api/-/merge_requests/12")
         let url = try #require(urls(http).last)

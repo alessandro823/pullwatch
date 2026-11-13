@@ -64,6 +64,8 @@ enum SnapshotTour {
             ("pull-requests-selected", { SnapshotCamera.selectRow(1, windowId: WindowID.main.rawValue) }),
             ("tags", { model.router.show(.tags) }),
             ("branches", { model.router.show(.branches) }),
+            // De gestapelde branch feature/dark-icons, met het inspectievenster.
+            ("branches-selected", { SnapshotCamera.selectRow(4, windowId: WindowID.main.rawValue) }),
             ("stats", { model.router.show(.stats) }),
             ("repos", { model.router.show(.repos) }),
             ("versions", { model.router.show(.dependencies) }),

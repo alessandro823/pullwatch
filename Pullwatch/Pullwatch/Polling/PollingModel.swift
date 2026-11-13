@@ -21,6 +21,11 @@ final class PollingModel {
     /// Per account de gevolgde repo's die het token niet kan lezen, uit de laatste tag- en
     /// branch-poll (`PollEngine.unreachableRepos()`); hun tags en branches worden niet bijgewerkt.
     private(set) var unreachableRepos: [UUID: UnreachableRepos] = [:]
+    /// Wanneer de branches het laatst zonder fout opgehaald werden (`PollEngine.lastBranchCheck()`),
+    /// voor "Gecheckt …" in Branches.
+    private(set) var branchesCheckedAt: Date?
+    /// Een poll op verzoek loopt (`refresh()`): de knop Laad opnieuw wacht dan.
+    private(set) var isRefreshing = false
 
     struct RefetchProgress: Equatable {
         let startedAt: Date
@@ -109,8 +114,12 @@ final class PollingModel {
             refreshAgain = true
             return
         }
+        isRefreshing = true
         refreshTask = Task {
-            defer { refreshTask = nil }
+            defer {
+                refreshTask = nil
+                isRefreshing = false
+            }
             repeat {
                 refreshAgain = false
                 await refreshNow()
@@ -152,6 +161,8 @@ final class PollingModel {
     }
 
     func tick() async {
+        // De boom van de vorige keer, ook na een start, voordat de poll hem bijwerkt.
+        if branches.trees.isEmpty { branches.trees = await engine.branchTrees() }
         await notifications.refreshAuthorization()
         let accounts = config.pollableAccounts
         let retention = config.historyRetention
@@ -194,9 +205,11 @@ final class PollingModel {
         await updateRefetchProgress()
         versions.startNewRepoVersionCheckIfNeeded(after: result)
         // Pas na de PR's en tags: een trage of mislukte branch-poll houdt die nooit op.
-        let pushes = await engine.pollBranches(accounts: accounts)
+        let pushes = await engine.pollBranches(accounts: accounts, retention: config.historyRetention)
         branches.apply(pushes, retention: config.historyRetention, now: Date())
+        branches.trees = await engine.branchTrees()
         unreachableRepos = await engine.unreachableRepos()
+        branchesCheckedAt = await engine.lastBranchCheck()
     }
 
     private func updateRefetchProgress() async {
