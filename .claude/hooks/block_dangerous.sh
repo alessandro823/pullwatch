@@ -40,8 +40,7 @@ if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[^;|&]*(--force([^-]|$)|--f
   fi
 fi
 
-# `git push origin main`, `HEAD:main`, `x:refs/heads/main`; the fork follows
-# origin/main with `git push fork origin/main:main`, which is allowed.
+# `git push origin main`, `HEAD:main`, `x:refs/heads/main`.
 if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[[:space:]]'; then
   if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[[:space:]]+([^;|&]*[[:space:]])?(origin|[^[:space:]]*alessandro823/pullwatch[^[:space:]]*)[[:space:]]+([^;|&]*[[:space:]:])?(refs/heads/)?(main|master)([[:space:]]|$|[;&|])'; then
     echo "BLOCKED: never push to main in alessandro823/pullwatch. Push a branch and open a pull request; Alessandro merges (CLAUDE.md, Where the work happens)." >&2
