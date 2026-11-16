@@ -18,8 +18,8 @@ of each part is in `docs/superpowers/specs/` and its plan in
 - **Never push to `main`, and never merge a pull request.** Alessandro
   reviews and merges each one himself; we open it and wait.
 - `fork` = `Vernum-Projecten/pullwatch`, our fork. It keeps the tracker
-  (issues and their relations, with the organisation's issue fields) and
-  follows `origin/main` (`git push fork origin/main:main` after a fetch).
+  (issues and their relations, with the organisation's issue fields); its
+  code is not kept in step and nothing tracks or pushes to it.
   A pull request links its issue as `Vernum-Projecten/pullwatch#<n>`.
 - `gh repo set-default Vernum-Projecten/pullwatch` once per clone, so `gh`
   and `scripts/gh/*` act on the tracker; pass `--repo
