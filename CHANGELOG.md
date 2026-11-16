@@ -9,6 +9,16 @@ release wait as fragments in `changelog.d/` until the cut writes them here.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-16
+
+### Added
+
+- The Branches section has a Reload button that fetches the branches right away, and shows when they were last checked (#262).
+
+### Changed
+
+- Branches shows each repository as a tree: the default branch at the top and every branch under the branch it was made from (the target of its pull request, or worked out from the history), with who pushed last, how far it is ahead and behind, and an inspector with the pushes of the selected branch. Merged and deleted branches can be shown with a toolbar switch (#265).
+
 ## [0.10.1] - 2026-11-13
 
 ### Changed
@@ -493,7 +503,8 @@ before this changelog existed. The fork starts from this version.
 - The repository overview is calculated once instead of on every screen
   update.
 
-[Unreleased]: https://github.com/alessandro823/pullwatch/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/alessandro823/pullwatch/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/alessandro823/pullwatch/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/alessandro823/pullwatch/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/alessandro823/pullwatch/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/alessandro823/pullwatch/compare/v0.9.0...v0.9.1
