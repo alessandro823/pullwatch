@@ -124,7 +124,15 @@ struct PublishedPackagesView: View {
         .navigationSubtitle(CheckedSubtitle.text(versions.versionReport?.checkedAt))
         .toolbar {
             ToolbarItem {
-                PublishedPackageTypeMenu(types: Set(versions.publishedPackages.map(\.package.type)), filter: $typeFilter)
+                // Het filter op soort: alle soorten, of één die voorkomt.
+                ValueFilterMenu(
+                    title: "Soort", allTitle: "Alle soorten", systemImage: "line.3.horizontal.decrease.circle",
+                    values: Set(versions.publishedPackages.map(\.package.type)).sorted { $0.rawValue < $1.rawValue },
+                    selection: $typeFilter
+                ) { type in
+                    Label { type.text } icon: { Image(systemName: type.symbol) }
+                }
+                .help("Toon alleen packages van één soort")
             }
             ToolbarItem {
                 Button {
@@ -353,27 +361,5 @@ private struct PublishedPackagesEmptyState: View {
         } else if isFiltered {
             FilteredEmptyView(searchText: searchText, clear: clearFilters)
         }
-    }
-}
-
-/// Het filter op soort in de knoppenbalk: alle soorten, of één die voorkomt.
-private struct PublishedPackageTypeMenu: View {
-    let types: Set<PublishedPackageType>
-    @Binding var filter: PublishedPackageType?
-
-    var body: some View {
-        Menu {
-            Picker("Soort", selection: $filter) {
-                Text("Alle soorten").tag(PublishedPackageType?.none)
-                ForEach(types.sorted { $0.rawValue < $1.rawValue }, id: \.self) { type in
-                    Label { type.text } icon: { Image(systemName: type.symbol) }
-                        .tag(Optional(type))
-                }
-            }
-            .pickerStyle(.inline)
-        } label: {
-            Label("Soort", systemImage: filter == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
-        }
-        .help("Toon alleen packages van één soort")
     }
 }

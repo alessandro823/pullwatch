@@ -35,9 +35,11 @@ struct PullRequestDTO: Decodable {
     struct Endpoint: Decodable {
         struct Commit: Decodable { let hash: String? }
         struct Repository: Decodable { let fullName: String? }
+        struct Branch: Decodable { let name: String? }
 
         let commit: Commit?
         let repository: Repository?
+        let branch: Branch?
     }
 
     struct Links: Decodable {

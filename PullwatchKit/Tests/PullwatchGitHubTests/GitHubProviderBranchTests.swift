@@ -23,9 +23,10 @@ import PullwatchTestSupport
     }
 
     /// Eén repo in een GraphQL-antwoord voor de branches.
-    func repoJSON(_ heads: [String], total: Int? = nil, next: String? = nil) -> String {
+    func repoJSON(_ heads: [String], total: Int? = nil, next: String? = nil, defaultBranch: String? = nil) -> String {
         let pageInfo = #"{"hasNextPage":\#(next != nil),"endCursor":\#(next.map { #""\#($0)""# } ?? "null")}"#
-        return #"{"refs":{"totalCount":\#(total ?? heads.count),"pageInfo":\#(pageInfo),"nodes":[\#(heads.joined(separator: ","))]}}"#
+        let defaultRef = defaultBranch.map { #""defaultBranchRef":{"name":"\#($0)"},"# } ?? ""
+        return #"{\#(defaultRef)"refs":{"totalCount":\#(total ?? heads.count),"pageInfo":\#(pageInfo),"nodes":[\#(heads.joined(separator: ","))]}}"#
     }
 
     func graphQL(_ repos: [String?]) -> String {
@@ -73,6 +74,17 @@ import PullwatchTestSupport
         #expect(feature.authorEmail == "piet@example.com")
         #expect(fetch.fingerprints["acme/api"] != nil)
         #expect(fetch.unavailableRepos.isEmpty && fetch.unchangedRepos.isEmpty)
+    }
+
+    @Test func `The full query reads the default branch`() async throws {
+        let http = MockHTTPClient()
+        http.on("api.github.com/graphql", body: graphQL([repoJSON([head("develop", oid: "a")], defaultBranch: "develop")]))
+
+        let fetch = try await makeProvider(http).branches(in: ["acme/api"], unchanged: [:])
+
+        #expect(fetch.defaultBranches == ["acme/api": "develop"])
+        let query = try #require(body(http.requests.first)?["query"] as? String)
+        #expect(query.contains("defaultBranchRef { name }"))
     }
 
     @Test func requestAsksForBranchesOfEveryRepoWithAliases() async throws {

@@ -29,6 +29,9 @@ public struct SeenState: Codable, Equatable, Sendable {
     /// Per gevolgde repo (`"{accountId}:{repo.lowercased()}"`) de branches met hun laatste commit
     /// van de vorige poll, zodat een push ook na een herstart te zien is; geprunet op `seenAt`.
     public var branchHeads: [String: BranchHeads] = [:]
+    /// Per gevolgde repo (dezelfde key als `branchHeads`) de boom van Branches; geprunet op
+    /// `checkedAt`, een verdwenen branch na de bewaartermijn (`PollEngine.pollBranches`).
+    public var repoBranches: [String: RepoBranches] = [:]
 
     public init() {}
 
@@ -50,6 +53,8 @@ public struct SeenState: Codable, Equatable, Sendable {
         queued = try container.decodeIfPresent([String: QueueMark].self, forKey: .queued) ?? [:]
         // Ontbreekt in seen.json van vóór branches.
         branchHeads = try container.decodeIfPresent([String: BranchHeads].self, forKey: .branchHeads) ?? [:]
+        // Ontbreekt in seen.json van vóór de boom in Branches.
+        repoBranches = try container.decodeIfPresent([String: RepoBranches].self, forKey: .repoBranches) ?? [:]
     }
 
     public func contains(_ key: String) -> Bool {
@@ -68,6 +73,7 @@ public struct SeenState: Codable, Equatable, Sendable {
         checks = checks.filter { now.timeIntervalSince($0.value.at) <= maxAge }
         queued = queued.filter { now.timeIntervalSince($0.value.at) <= maxAge }
         branchHeads = branchHeads.filter { now.timeIntervalSince($0.value.seenAt) <= maxAge }
+        repoBranches = repoBranches.filter { now.timeIntervalSince($0.value.checkedAt) <= maxAge }
         dropOrphanFingerprints()
     }
 
@@ -84,6 +90,7 @@ public struct SeenState: Codable, Equatable, Sendable {
         checks = checks.filter { isFresh($0.key, $0.value.at) }
         queued = queued.filter { isFresh($0.key, $0.value.at) }
         branchHeads = branchHeads.filter { isFresh($0.key, $0.value.seenAt) }
+        repoBranches = repoBranches.filter { isFresh($0.key, $0.value.checkedAt) }
         dropOrphanFingerprints()
     }
 
@@ -95,6 +102,7 @@ public struct SeenState: Codable, Equatable, Sendable {
         checks = checks.filter { key, _ in keyPrefixes.contains(where: { key.hasPrefix($0) }) }
         queued = queued.filter { key, _ in keyPrefixes.contains(where: { key.hasPrefix($0) }) }
         branchHeads = branchHeads.filter { key, _ in keyPrefixes.contains(where: { key.hasPrefix($0) }) }
+        repoBranches = repoBranches.filter { key, _ in keyPrefixes.contains(where: { key.hasPrefix($0) }) }
         dropOrphanFingerprints()
     }
 

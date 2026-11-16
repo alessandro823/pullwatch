@@ -36,6 +36,27 @@ import PullwatchTestSupport
         #expect(prs.first { $0.number == 17 }?.mergeQueue == nil)
     }
 
+    @Test func `A pull request carries its branch and target branch without refs/heads/`() async throws {
+        let http = MockHTTPClient()
+        http.on("_apis/projects", body: projects)
+        http.on("_apis/git/pullrequests", body: #"""
+            {"value":[{"pullRequestId":5,"title":"PR 5","creationDate":"2025-10-15T10:00:00Z",
+             "sourceRefName":"refs/heads/feature/x","targetRefName":"refs/heads/main",
+             "createdBy":{"id":"user-guid","displayName":"Jan Jansen"},
+             "repository":{"name":"api","project":{"name":"My Project"}}}]}
+            """#)
+
+        let pr = try #require(try await makeProvider(http).openPullRequests().first)
+
+        #expect(pr.sourceBranch == "feature/x")
+        #expect(pr.targetBranch == "main")
+    }
+
+    @Test(arguments: [("refs/heads/a/b", "a/b"), ("refs/tags/v1", nil), ("refs/pull/1/merge", nil)] as [(String, String?)])
+    func `Only a branch ref gives a branch name`(ref: String, name: String?) {
+        #expect(AzureDevOpsProvider.branchName(ref) == name)
+    }
+
     @Test func mapsPullRequestFields() async throws {
         let http = MockHTTPClient()
         http.on("_apis/projects", body: projects)

@@ -171,12 +171,18 @@ public actor GiteaProvider: PRProvider {
 
     func makePullRequest(_ dto: PullRequestDTO, repo: String) throws -> PullRequest {
         let merged = dto.merged == true
-        return try makePullRequest(
+        var pullRequest = try makePullRequest(
             repo: dto.base?.repo?.fullName ?? repo, number: dto.number, title: dto.title, user: dto.user,
             draft: dto.draft, open: dto.state == "open", merged: merged,
             closedAt: merged ? (dto.mergedAt ?? dto.closedAt) : dto.closedAt,
             createdAt: dto.createdAt, updatedAt: dto.updatedAt, htmlURL: dto.htmlUrl
         )
+        // Alleen een PR uit dezelfde repo: een branch in een fork hoort niet in de boom.
+        if dto.head?.repo?.fullName == nil || dto.head?.repo?.fullName == dto.base?.repo?.fullName {
+            pullRequest.sourceBranch = dto.head?.ref
+            pullRequest.targetBranch = dto.base?.ref
+        }
+        return pullRequest
     }
 
     private func makePullRequest(

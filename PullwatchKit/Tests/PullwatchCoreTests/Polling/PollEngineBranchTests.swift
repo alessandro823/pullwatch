@@ -16,8 +16,10 @@ import PullwatchTestSupport
             engine = PollEngine(makeProvider: { _ in provider }, store: nil, now: { clock.now })
         }
 
-        /// Eén ronde zoals de app hem doet: eerst `poll`, dan `pollBranches`.
+        /// Eén ronde zoals de app hem doet: eerst `poll`, dan `pollBranches`. Zonder vergelijkingen
+        /// voor de boom (`PollEngineBranchTreeTests`), zodat `compareCalls` alleen de pushes telt.
         func poll(_ account: Account) async -> Tick {
+            await engine.setBranchTreeBudget(0)
             let result = await engine.poll(accounts: [account], interval: 120, retention: .oneYear)
             return Tick(result: result, branchPushes: await engine.pollBranches(accounts: [account]))
         }
@@ -378,6 +380,41 @@ import PullwatchTestSupport
 
         #expect(await h.engine.pollBranches(accounts: [account]).isEmpty)
         #expect(await h.provider.branchCalls == 1)
+    }
+
+    @Test func `Reload fetches the branches again within the interval`() async {
+        let h = Harness()
+        await h.set([head("main", "1", at: h.clock.now)])
+        _ = await h.poll(account)
+        h.clock.advance(60)
+
+        await h.engine.forceRefresh()
+        _ = await h.poll(account)
+
+        #expect(await h.provider.branchCalls == 2)
+        #expect(await h.engine.lastBranchCheck() == h.clock.now)
+    }
+
+    @Test func `A round without errors sets the branch check time`() async {
+        let h = Harness()
+        #expect(await h.engine.lastBranchCheck() == nil)
+        await h.set([head("main", "1", at: h.clock.now)])
+
+        _ = await h.poll(account)
+
+        #expect(await h.engine.lastBranchCheck() == h.clock.now)
+    }
+
+    @Test func `A failed branch round keeps the previous check time`() async {
+        let h = Harness()
+        await h.set([head("main", "1", at: h.clock.now)])
+        _ = await h.poll(account)
+        let checked = h.clock.now
+        await h.provider.set(branchError: .network("kapot"))
+
+        _ = await h.nextBranchPoll(account)
+
+        #expect(await h.engine.lastBranchCheck() == checked)
     }
 
     @Test func `A push seen after a long gap keeps its commit date`() async {

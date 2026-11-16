@@ -398,4 +398,32 @@ func urls(_ http: MockHTTPClient) -> [String] {
         #expect(endpoint.absoluteString == "https://example.com/forgejo/api/v1/user")
         #expect(SourcesOverview.server(of: account).appending(path: "user") == endpoint)
     }
+
+@Suite struct GiteaPullRequestBranchTests {
+    @Test func `A pull request from the same repository carries its branches`() async throws {
+        let dto = try JSONDecoding.decode(PullRequestDTO.self, from: Data(GiteaFixtures.pull(number: 12).utf8), snakeCase: true)
+
+        let pr = try await makeProvider(MockHTTPClient()).makePullRequest(dto, repo: "acme/api")
+
+        #expect(pr.sourceBranch == "feature")
+        #expect(pr.targetBranch == "main")
+    }
+
+    @Test func `A pull request from a fork has no source branch`() async throws {
+        let dto = try JSONDecoding.decode(PullRequestDTO.self, from: Data(Self.withForkHead(GiteaFixtures.pull(number: 12)).utf8), snakeCase: true)
+
+        let pr = try await makeProvider(MockHTTPClient()).makePullRequest(dto, repo: "acme/api")
+
+        #expect(pr.sourceBranch == nil)
+    }
+
+    /// De head-repo wordt `jane/api`, een fork.
+    static func withForkHead(_ json: String) -> String {
+        guard let range = json.range(of: #""head":"#) else { return json }
+        var tail = String(json[range.lowerBound...])
+        tail = tail.replacingOccurrences(of: #""full_name":"acme/api""#, with: #""full_name":"jane/api""#)
+        return String(json[..<range.lowerBound]) + tail
+    }
+}
+
 }

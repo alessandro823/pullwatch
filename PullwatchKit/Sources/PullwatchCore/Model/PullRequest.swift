@@ -45,6 +45,10 @@ public struct PullRequest: Codable, Hashable, Sendable {
     /// Of de PR uit de rij ging zonder te mergen, wanneer en waarom (`MergeQueueExit`); weer in
     /// de rij komen wist het. Telt alleen zolang de PR open is en niet in de rij staat.
     public var leftQueue: MergeQueueExit?
+    /// De branch van de PR en de branch waar hij in moet; nil als de dienst ze niet gaf (bij
+    /// GitHub alleen voor open PR's die geen draft zijn). Voor de ouder van een branch in Branches.
+    public var sourceBranch: String?
+    public var targetBranch: String?
 
     public init(
         accountId: UUID,
@@ -63,7 +67,9 @@ public struct PullRequest: Codable, Hashable, Sendable {
         revision: String? = nil,
         checks: PRChecks? = nil,
         mergeQueue: MergeQueueEntry? = nil,
-        leftQueue: MergeQueueExit? = nil
+        leftQueue: MergeQueueExit? = nil,
+        sourceBranch: String? = nil,
+        targetBranch: String? = nil
     ) {
         self.accountId = accountId
         self.repo = repo
@@ -82,11 +88,13 @@ public struct PullRequest: Codable, Hashable, Sendable {
         self.checks = checks
         self.mergeQueue = mergeQueue
         self.leftQueue = leftQueue
+        self.sourceBranch = sourceBranch
+        self.targetBranch = targetBranch
     }
 
     private enum CodingKeys: String, CodingKey {
         case accountId, repo, number, title, authorId, authorName, isDraft, createdAt, webURL, state, closedAt, coAuthors, revision, checks
-        case mergeQueue, authorAvatarURL, leftQueue
+        case mergeQueue, authorAvatarURL, leftQueue, sourceBranch, targetBranch
     }
 
     /// Oude JSON heeft geen `state`/`closedAt`: dan is de PR open. Zonder `coAuthors` (van vóór de
@@ -114,6 +122,9 @@ public struct PullRequest: Codable, Hashable, Sendable {
         mergeQueue = try c.decodeIfPresent(MergeQueueEntry.self, forKey: .mergeQueue)
         // Ontbreekt in JSON van vóór de melding "uit de rij".
         leftQueue = try c.decodeIfPresent(MergeQueueExit.self, forKey: .leftQueue)
+        // Ontbreekt in JSON van vóór de boom in Branches.
+        sourceBranch = try c.decodeIfPresent(String.self, forKey: .sourceBranch)
+        targetBranch = try c.decodeIfPresent(String.self, forKey: .targetBranch)
     }
 
     /// Open, niet in de rij, en eerder uit de rij gegaan zonder te mergen.

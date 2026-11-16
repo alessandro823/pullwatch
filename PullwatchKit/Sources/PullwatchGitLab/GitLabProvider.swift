@@ -229,7 +229,9 @@ public actor GitLabProvider: PRProvider {
             revision: dto.sha ?? dto.updatedAt,
             // "Merge als de pipeline slaagt" (auto-merge), ook hoe een merge request in een merge
             // train komt; de plek in de train komt erbij in `withMergeTrains`.
-            mergeQueue: state == .open && dto.mergeWhenPipelineSucceeds == true ? MergeQueueEntry(kind: .autoMerge) : nil
+            mergeQueue: state == .open && dto.mergeWhenPipelineSucceeds == true ? MergeQueueEntry(kind: .autoMerge) : nil,
+            sourceBranch: dto.sourceBranch,
+            targetBranch: dto.targetBranch
         )
         if let name = dto.author.name, !name.isEmpty { authorNames[pullRequest.dedupKey] = name }
         return pullRequest

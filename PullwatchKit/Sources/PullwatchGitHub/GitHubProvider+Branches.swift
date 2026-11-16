@@ -91,6 +91,7 @@ extension GitHubProvider {
                 guard let node = nodes[repo] else { continue }
                 guard let rest = try await laterPages(of: repo, after: node, fetch: &fetch) else { continue }
                 fetch.fingerprints[repo] = node.fingerprint
+                if let name = node.defaultBranchRef?.name { fetch.defaultBranches[repo] = name }
                 fetch.heads += makeHeads(repo: repo, node.refs.nodes + rest)
             }
         }
@@ -258,7 +259,8 @@ extension GitHubProvider {
 }
 
 /// GraphQL: per repo (alias `r0`, `r1`, …; variabelen `o0`/`n0` voor eigenaar en naam, `c0`
-/// voor de cursor van een volgende pagina) de branches met hun laatste commit en auteur.
+/// voor de cursor van een volgende pagina) de branches met hun laatste commit en auteur, en in de
+/// volle vraag de standaardbranch.
 private struct BranchQuery: Encodable {
     let query: String
     let variables: [String: String]
@@ -270,7 +272,8 @@ private struct BranchQuery: Encodable {
             .joined(separator: ", ")
         let fields = (0..<count).map { index in
             let after = full ? ", after: $c\(index)" : ""
-            return "  r\(index): repository(owner: $o\(index), name: $n\(index)) { refs(refPrefix: \"refs/heads/\", first: \(GitHubProvider.branchPageSize)\(after)) { ...\(full ? "Heads" : "HeadShas") } }"
+            let defaultRef = full ? "defaultBranchRef { name } " : ""
+            return "  r\(index): repository(owner: $o\(index), name: $n\(index)) { \(defaultRef)refs(refPrefix: \"refs/heads/\", first: \(GitHubProvider.branchPageSize)\(after)) { ...\(full ? "Heads" : "HeadShas") } }"
         }.joined(separator: "\n")
         let fragment = full
             ? """
@@ -309,7 +312,13 @@ private struct BranchQuery: Encodable {
             let nodes: [Ref]
         }
 
+        struct DefaultRef: Decodable {
+            let name: String
+        }
+
         let refs: Refs
+        /// Alleen in de volle vraag; nil in een lege repo.
+        let defaultBranchRef: DefaultRef?
 
         /// Over de eerste pagina: in de kleine en de volle vraag dezelfde.
         var fingerprint: String {

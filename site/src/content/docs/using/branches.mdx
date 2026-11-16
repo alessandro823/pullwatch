@@ -1,32 +1,48 @@
 ---
 title: Branches
-description: Which branches of your followed repositories received pushes, by whom and when.
+description: The branches of your followed repositories as a tree from the default branch, who pushed last and how far each one is from where it came from.
 ---
 
 import Screenshot from '../../../components/Screenshot.astro';
 
-**Branches** in the sidebar (⌘3) shows pushes to the branches of the repositories you follow, newest first. It answers a question the PRs and Tags lists cannot: who is working on what, before there is a pull request or a tag.
+**Branches** in the sidebar (⌘3) shows the branches of the repositories you follow as a tree: per repository the default branch at the top, and every other branch under the branch it was made from. It answers a question the PRs and Tags lists cannot: who is working on what, before there is a pull request or a tag.
 
-<Screenshot name="branches" alt="The Branches section: pushes to branches of three repositories, each with its branch name, repository, author, the number of new commits and the time of the push." />
+<Screenshot name="branches" alt="The Branches section: per repository a tree from main, with a stacked branch under the branch it was made from, the last person who pushed, how far each branch is ahead and behind, and the inspector of the selected branch." />
 
-## What a row shows
+## The tree
 
-Each row has the branch, the repository, who pushed (with their picture), the commits and when. The Commits column says what happened:
+Each repository is a group you can fold with a click on its name; next to it, how many branches got a push today. Under it:
 
-- `+3`: three new commits since Pullwatch last looked.
-- **Force Push**: the branch was rewritten, so its history no longer continues from before.
-- **New Branch**: the branch did not exist yet.
-- No label: the last commit of a branch that moved in the past 14 days. Pullwatch fills the list this way the first time it reads a repository, so the section is not empty on day one.
+- The default branch, marked **default**.
+- Every branch under the branch it was made from, any number of levels deep. The most recent push comes first.
+- **Who**: the person who pushed last, with their picture. Click a name to see only their branches.
+- **Ahead / Behind**: ↑3 ↓1 means three commits the parent does not have, and one commit of the parent this branch does not have yet.
+- **Last Push**, with a dot when it was in the past hour.
+- A pill with the number of an open pull request, and **New Branch** or **Force Push** when that happened in the past day.
 
-Pullwatch sees what changed between two reads, not each separate push. Three pushes between two reads are one row with all the new commits.
+## How Pullwatch knows where a branch came from
+
+Git and the services do not record which branch a branch was made from. Pullwatch works it out in this order:
+
+1. The target branch of an open pull request from the branch.
+2. Otherwise the history: the branch it is the fewest commits ahead of, which is how Git itself suggests finding it.
+3. Otherwise the default branch.
+
+The inspector says which of the three it was. Working it out takes a few requests per new branch, so a repository with many new branches can need a few reads before every branch is in its place; until then such a branch hangs under the default branch.
+
+## The inspector
+
+Select a branch to see it on the right: the path from the default branch, **Compare with Parent** (the comparison at the service), **Open in browser** and **Copy Branch Name**. Below that, **Made from** with how Pullwatch knows, how far the branch is from its parent and from the default branch, its pull request and the last push. **Activity** lists the pushes Pullwatch saw, each opening its comparison.
+
+Pullwatch sees what changed between two reads, not each separate push. Three pushes between two reads are one entry with all the new commits.
 
 ## Search and filters
 
-Search by branch, repository or person. The toolbar filters on a repository or a person, and clicking a name in the table filters on that person too. **Others Only** hides your own pushes.
+Search by branch, repository or person. The toolbar filters on a repository or a person; **Others Only** hides the branches you pushed to last. A branch that matches keeps the branches above it, so you still see where it hangs.
+
+**Deleted Branches** also shows branches that were merged or deleted, dimmed and crossed out, as long as the history is kept. **Reload** reads the branches right away; the subtitle says when they were last checked.
 
 Pullwatch recognises your own pushes by your account on GitHub, and on Bitbucket and Gitea where the account is linked to the person. Otherwise it compares the name and the e-mail address of the author with yours.
-
-Double-click a row (or choose **Open in browser** in the context menu) to open the comparison at the service. Pullwatch does not show commits or files itself.
 
 ## No notifications
 
