@@ -35,7 +35,8 @@ Pullwatch.app            AgentServer → MCPSocketServer → one PullwatchMCPSer
     Pullwatch: Settings, Agents"; the socket is never touched.
   - `whileOpen`: without a socket, "Open Pullwatch to use it from an agent."
   - `always`: without a socket it opens Pullwatch through `NSWorkspace`
-    (not activated, so no window comes forward) and waits up to 10 s, else
+    (not activated, and with `-PullwatchLaunchedByAgent YES`, so it restores no
+    window) and waits up to 25 s, else
     "Pullwatch did not start in time. …".
   - When the app drops the connection (a Sparkle update), requests in flight
     get "Pullwatch closed the connection while answering. Try again.", and

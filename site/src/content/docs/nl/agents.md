@@ -275,7 +275,7 @@ De keuze is **Zolang Pullwatch open is** en Pullwatch draait niet. Open het, of 
 Pullwatch did not start in time. Open Pullwatch to use it from an agent.
 ```
 
-De keuze is **Altijd**, maar Pullwatch was niet binnen 10 seconden klaar. Open het zelf. Opent het niet vanaf het pad in de instelling van je agent, dan heb je de app verplaatst: stel de agent opnieuw in.
+De keuze is **Altijd**, maar Pullwatch was niet binnen 25 seconden klaar. Open het zelf. Opent het niet vanaf het pad in de instelling van je agent, dan heb je de app verplaatst: stel de agent opnieuw in.
 
 ### Wacht op toestemming
 

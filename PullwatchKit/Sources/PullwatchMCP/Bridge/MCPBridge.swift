@@ -29,7 +29,7 @@ public struct MCPBridge: Sendable {
             self.pollInterval = pollInterval
         }
 
-        public static let standard = Timing(launchWait: .seconds(10), reconnectWait: .seconds(10), pollInterval: .milliseconds(100))
+        public static let standard = Timing(launchWait: .seconds(25), reconnectWait: .seconds(10), pollInterval: .milliseconds(100))
     }
 
     /// De foutmeldingen van de helper. Ze zijn voor het model van de agent, dus Engels en niet
