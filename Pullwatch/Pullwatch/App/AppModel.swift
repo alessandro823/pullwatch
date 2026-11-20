@@ -95,6 +95,12 @@ final class AppModel {
         versions.didChangeSeenPackages = { overview.recomputeSidebar() }
     }
 
+    /// De helper van een agent startte de app (`-PullwatchLaunchedByAgent YES`, stand Altijd):
+    /// dan herstelt de app geen hoofdvenster, zodat het starten van een agent niets in beeld zet.
+    nonisolated static var launchedByAgent: Bool {
+        UserDefaults.standard.bool(forKey: PullwatchAppLocation.launchedByAgentArgument)
+    }
+
     /// De app draait als host van de unit-tests: niet pollen, melden of vensters openen.
     nonisolated static var isTestHost: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil

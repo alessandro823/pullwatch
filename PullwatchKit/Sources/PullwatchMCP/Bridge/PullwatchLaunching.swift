@@ -27,6 +27,10 @@ public enum PullwatchAppLocation {
     /// De launch-argumenten van de helper die de app ook moet krijgen, zodat een helper met een
     /// eigen datamap (`-PullwatchDataDirectory`, de tests) een app start die dezelfde map en geen
     /// echte tokens gebruikt.
+    /// Het argument dat de helper meegeeft als hij de app zelf start: de app herstelt dan geen
+    /// venster, zodat een agent die Pullwatch start niets in beeld zet.
+    public static let launchedByAgentArgument = "PullwatchLaunchedByAgent"
+
     public static let forwardedArguments = ["PullwatchDataDirectory", "PullwatchEphemeralSecrets", "PullwatchFakeGitHub"]
 
     /// `-Naam waarde` voor elk van `forwardedArguments` dat in `arguments` (het argumentdomein van

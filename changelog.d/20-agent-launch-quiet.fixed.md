@@ -1,0 +1,1 @@
+- When an agent starts Pullwatch (Settings, Agents, **Always**), Pullwatch no longer brings back the window that was open when it last quit, so starting a coding agent puts nothing on screen. The agent's helper also waits up to 25 seconds instead of 10 for Pullwatch to be ready, so a slow start no longer fails the agent's connection.

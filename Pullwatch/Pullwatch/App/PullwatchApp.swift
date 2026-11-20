@@ -46,6 +46,8 @@ struct PullwatchApp: App {
         .commands { AppCommands(model: model) }
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
+        // Gestart door de helper van een agent: het venster van de vorige keer niet terugzetten.
+        .restorationBehavior(AppModel.launchedByAgent ? .disabled : .automatic)
 
         Window("Welkom bij Pullwatch", id: WindowID.onboarding.rawValue) {
             OnboardingView()

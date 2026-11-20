@@ -275,7 +275,7 @@ Le choix est **Tant que Pullwatch est ouvert** et Pullwatch ne tourne pas. Ouvre
 Pullwatch did not start in time. Open Pullwatch to use it from an agent.
 ```
 
-Le choix est **Toujours**, mais Pullwatch n’était pas prêt en 10 secondes. Ouvrez-le vous-même. S’il ne s’ouvre pas depuis le chemin de la configuration de votre agent, vous avez déplacé l’app : configurez à nouveau l’agent.
+Le choix est **Toujours**, mais Pullwatch n’était pas prêt en 25 secondes. Ouvrez-le vous-même. S’il ne s’ouvre pas depuis le chemin de la configuration de votre agent, vous avez déplacé l’app : configurez à nouveau l’agent.
 
 ### En attente d’autorisation
 

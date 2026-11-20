@@ -275,7 +275,7 @@ Die Auswahl ist **Solange Pullwatch geöffnet ist**, und Pullwatch läuft nicht.
 Pullwatch did not start in time. Open Pullwatch to use it from an agent.
 ```
 
-Die Auswahl ist **Immer**, aber Pullwatch war nicht innerhalb von 10 Sekunden bereit. Öffne es selbst. Öffnet es sich nicht über den Pfad in der Einrichtung deines Agenten, hast du die App verschoben: Richte den Agenten erneut ein.
+Die Auswahl ist **Immer**, aber Pullwatch war nicht innerhalb von 25 Sekunden bereit. Öffne es selbst. Öffnet es sich nicht über den Pfad in der Einrichtung deines Agenten, hast du die App verschoben: Richte den Agenten erneut ein.
 
 ### Wartet auf Erlaubnis
 

@@ -275,7 +275,7 @@ The choice is **While Pullwatch is open** and Pullwatch is not running. Open it,
 Pullwatch did not start in time. Open Pullwatch to use it from an agent.
 ```
 
-The choice is **Always**, but Pullwatch was not ready within 10 seconds. Open it yourself. If it does not open from the path in your agent's setup, you moved the app: set up the agent again.
+The choice is **Always**, but Pullwatch was not ready within 25 seconds. Open it yourself. If it does not open from the path in your agent's setup, you moved the app: set up the agent again.
 
 ### Waiting for approval
 

@@ -265,7 +265,7 @@ of each part is in `docs/superpowers/specs/` and its plan in
   gets "Agents are turned off in Pullwatch: Settings, Agents";
   `whileOpen`: without a socket "Open Pullwatch to use it from an agent.";
   `always`: starts Pullwatch through `PullwatchLaunching` and waits up to
-  10 s), reconnecting once with a replayed handshake when the app restarts,
+  25 s), reconnecting once with a replayed handshake when the app restarts,
   and never after `notifications/pullwatch/disconnected` ("Pullwatch
   disconnected this agent. …"). The app links it. `docs/mcp.md` has the
   architecture, the peer check, the SDK workarounds, how to add a tool and
